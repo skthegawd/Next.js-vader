@@ -1,0 +1,16 @@
+body {
+    background-color: black;
+    color: red;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.sidebar {
+    background: #222;
+    padding: 20px;
+}
+
+.terminal {
+    background: black;
+    border: 1px solid red;
+    padding: 20px;
+}
