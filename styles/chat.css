@@ -1,0 +1,19 @@
+.chat-container {
+    display: flex;
+    background: black;
+    color: white;
+}
+
+.chat-main {
+    margin-left: 250px;
+    padding: 20px;
+    width: 100%;
+}
+
+button {
+    background: red;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+}
