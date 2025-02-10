@@ -1,0 +1,7 @@
+.terminal {
+    background: black;
+    color: green;
+    border: 2px solid red;
+    padding: 20px;
+    font-family: 'Courier New', Courier, monospace;
+}
