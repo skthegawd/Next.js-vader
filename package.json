@@ -1,18 +1,18 @@
 {
-    "name": "vader-ai",
-    "version": "1.0.0",
-    "private": true,
-    "dependencies": {
-        "next": "latest",
-        "react": "latest",
-        "react-dom": "latest",
-        "react-speech-recognition": "latest",
-        "axios": "latest"
-    },
-    "scripts": {
-        "dev": "next dev",
-        "build": "next build",
-        "start": "next start"
-    }
+  "name": "vader-ai",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "axios": "latest",
+    "react-speech-recognition": "latest",
+    "regenerator-runtime": "latest"
+  }
 }
-
