@@ -1,16 +1,21 @@
 import { Html, Head, Main, NextScript } from 'next/document';
+import { Component } from 'react';
 
-export default function Document() {
-    return (
-        <Html lang="en">
-            <Head>
-                <link rel="icon" href="/vader-logo.png" />
-                <meta name="theme-color" content="#000000" />
-            </Head>
-            <body>
-                <Main />
-                <NextScript />
-            </body>
-        </Html>
-    );
+class MyDocument extends Component {
+    render() {
+        return (
+            <Html>
+                <Head>
+                    {/* Add any meta tags, fonts, or scripts here */}
+                </Head>
+                <body>
+                    <Main />
+                    <NextScript />
+                </body>
+            </Html>
+        );
+    }
 }
+
+export default MyDocument;
+
