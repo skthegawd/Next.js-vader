@@ -6,6 +6,7 @@
         "next": "latest",
         "react": "latest",
         "react-dom": "latest",
+        "react-speech-recognition": "latest",
         "axios": "latest"
     },
     "scripts": {
