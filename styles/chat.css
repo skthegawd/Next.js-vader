@@ -7,7 +7,7 @@
     height: 100vh;
     background: #0a0a0a;
     color: white;
-    font-family: 'Arial', sans-serif;
+    font-family: 'Courier New', Courier, monospace;
 }
 
 /* Chat Main Area */
@@ -28,6 +28,8 @@
     padding: 10px;
     background: black;
     border-radius: 5px;
+    display: flex;
+    flex-direction: column;
 }
 
 /* User & Bot Messages */
@@ -37,6 +39,7 @@
     border-radius: 5px;
     max-width: 80%;
     word-wrap: break-word;
+    display: inline-block;
 }
 
 .user-message {
@@ -49,6 +52,7 @@
     background: #333;
     align-self: flex-start;
     text-align: left;
+    box-shadow: 0px 0px 10px rgba(255, 0, 0, 0.3);
 }
 
 /* Input Field & Send Button */
@@ -65,6 +69,7 @@ input[type="text"] {
     background: black;
     color: white;
     border-radius: 5px;
+    font-size: 16px;
 }
 
 button {
@@ -75,6 +80,8 @@ button {
     cursor: pointer;
     border-radius: 5px;
     margin-left: 5px;
+    font-size: 16px;
+    transition: background 0.3s;
 }
 
 button:hover {
