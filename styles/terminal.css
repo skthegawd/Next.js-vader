@@ -24,6 +24,20 @@
     background: rgba(0, 0, 0, 0.8);
     border-radius: 5px;
     box-shadow: inset 0px 0px 10px rgba(255, 0, 0, 0.5);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Typing Indicator Animation */
+.typing-indicator {
+    font-style: italic;
+    color: #ff4444;
+    animation: blink 1.5s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }
 
 /* Terminal Input Area */
