@@ -16,16 +16,16 @@ export default function Chat() {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    const sendMessage = async (text) => {
-        if (!text.trim()) return;
+    const sendMessage = async () => {
+        if (!input.trim() || loading) return; // Prevent empty input and multiple requests
 
-        const userMessage = { sender: 'user', text };
+        const userMessage = { sender: 'user', text: input };
         setMessages(prev => [...prev, userMessage]);
         setInput('');
         setLoading(true);
 
         try {
-            const response = await sendToAI(text);
+            const response = await sendToAI(input);
             if (response && response.reply) {
                 const botMessage = { sender: 'bot', text: response.reply };
                 setMessages(prev => [...prev, botMessage]);
@@ -63,9 +63,12 @@ export default function Chat() {
                         value={input} 
                         onChange={(e) => setInput(e.target.value)}
                         placeholder="Type your message..."
-                        onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)}
+                        onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                        disabled={loading}
                     />
-                    <button onClick={() => sendMessage(input)}>Send</button>
+                    <button onClick={sendMessage} disabled={loading}>
+                        {loading ? 'Processing...' : 'Send'}
+                    </button>
                 </div>
                 <VoiceAssistant onTranscribe={(transcription) => sendMessage(transcription)} />
                 <WakewordListener onWakewordDetected={() => sendMessage("How may I serve you, my master?")} />
