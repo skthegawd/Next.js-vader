@@ -1,36 +1,37 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import Sidebar from '../components/Sidebar';
 import VoiceAssistant from '../components/VoiceAssistant';
 import WakewordListener from '../components/WakewordListener';
-import styles from '../styles/chat.css';
+import { sendToAI } from '../lib/api';
+import '../styles/chat.css';
 
 export default function Chat() {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
+    const [loading, setLoading] = useState(false);
+    const chatEndRef = useRef(null);
+
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
 
     const sendMessage = async (text) => {
         if (!text.trim()) return;
-
+        
         const userMessage = { sender: 'user', text };
-        setMessages((prev) => [...prev, userMessage]);
+        setMessages(prev => [...prev, userMessage]);
+        setInput('');
+        setLoading(true);
 
         try {
-            const response = await fetch(process.env.NEXT_PUBLIC_BACKEND_URL + '/api/gpt', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text })
-            });
-            const data = await response.json();
-            const botMessage = { sender: 'bot', text: data.reply };
-            setMessages((prev) => [...prev, botMessage]);
+            const response = await sendToAI(text);
+            const botMessage = { sender: 'bot', text: response.reply };
+            setMessages(prev => [...prev, botMessage]);
         } catch (error) {
-            console.error('Error sending message:', error);
+            setMessages(prev => [...prev, { sender: 'bot', text: '[Error] Unable to process request.' }]);
         }
-    };
-
-    const handleWakewordDetection = () => {
-        sendMessage("How may I serve you, my master.");
+        setLoading(false);
     };
 
     return (
@@ -48,6 +49,8 @@ export default function Chat() {
                             {msg.text}
                         </div>
                     ))}
+                    {loading && <div className="typing-indicator">Vader is thinking...</div>}
+                    <div ref={chatEndRef} />
                 </div>
                 <div className="input-container">
                     <input 
@@ -55,11 +58,12 @@ export default function Chat() {
                         value={input} 
                         onChange={(e) => setInput(e.target.value)} 
                         placeholder="Type your message..." 
+                        onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)}
                     />
                     <button onClick={() => sendMessage(input)}>Send</button>
                 </div>
                 <VoiceAssistant onTranscribe={(transcription) => sendMessage(transcription)} />
-                <WakewordListener onWakewordDetected={handleWakewordDetection} />
+                <WakewordListener onWakewordDetected={() => sendMessage("How may I serve you, my master?")} />
             </main>
         </div>
     );
