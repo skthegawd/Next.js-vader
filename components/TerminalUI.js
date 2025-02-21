@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { sendToAI } from '../lib/api';
+import { tts_api_tts, stt_api_stt, wakeword_api_wakeword } from '../lib/voice';
 
 export default function TerminalUI() {
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState(["Lord Vader, your AI assistant is at your command."]);
+    const [loading, setLoading] = useState(false);
 
     const handleSend = async () => {
         if (!input.trim()) return;
+        setLoading(true);
         const userMessage = `> ${input}`;
         setMessages(prev => [...prev, userMessage]);
         setInput('');
@@ -14,8 +17,11 @@ export default function TerminalUI() {
         try {
             const response = await sendToAI(input);
             setMessages(prev => [...prev, response.reply]);
+            await tts_api_tts(response.reply);
         } catch (error) {
-            setMessages(prev => [...prev, "[Error] Unable to process command. Please try again."]);
+            setMessages(prev => [...prev, "[Error] Unable to process command. Try again."]);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -35,7 +41,9 @@ export default function TerminalUI() {
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                     className="terminal-textbox"
                 />
-                <button onClick={handleSend} className="terminal-button">Send</button>
+                <button onClick={handleSend} className="terminal-button" disabled={loading}>
+                    {loading ? 'Processing...' : 'Send'}
+                </button>
             </div>
             <style jsx>{`
                 .terminal {
@@ -47,8 +55,11 @@ export default function TerminalUI() {
                     border: 2px solid #ff4444;
                     box-shadow: 0 0 10px #ff0000;
                     overflow-y: auto;
+                    display: flex;
+                    flex-direction: column;
                 }
                 .terminal-output {
+                    flex-grow: 1;
                     max-height: 60vh;
                     overflow-y: auto;
                     margin-bottom: 10px;
