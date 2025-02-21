@@ -32,26 +32,26 @@ export default function VoiceAssistant() {
         const userMessage = `> ${input}`;
         setMessages(prev => [...prev, userMessage]);
         setInput('');
-    
+
         try {
             console.log("[DEBUG] Sending request to GPT API...");
             const response = await sendToAI(input);
             console.log("[DEBUG] GPT API Response:", response);
-            
+
             if (response.error) {
                 throw new Error(response.error);
             }
-            
+
             setMessages(prev => [...prev, response.reply]);
             await tts_api_tts(response.reply);
         } catch (error) {
-            console.error("[ERROR] GPT API Failed:", error);
+            console.error("[ERROR] AI Processing Failed:", error);
             setMessages(prev => [...prev, "[Error] Unable to process command. Try again."]);
         } finally {
             setLoading(false);
         }
     };
-    
+
     return (
         <div className="terminal">
             <div className="terminal-output">
@@ -72,46 +72,6 @@ export default function VoiceAssistant() {
                     {loading ? 'Processing...' : 'Send'}
                 </button>
             </div>
-            <style jsx>{`
-                .terminal {
-                    background: black;
-                    color: #33ff33;
-                    font-family: 'Courier New', monospace;
-                    padding: 20px;
-                    height: 80vh;
-                    border: 2px solid #ff4444;
-                    box-shadow: 0 0 10px #ff0000;
-                    overflow-y: auto;
-                    display: flex;
-                    flex-direction: column;
-                }
-                .terminal-output {
-                    flex-grow: 1;
-                    max-height: 60vh;
-                    overflow-y: auto;
-                    margin-bottom: 10px;
-                }
-                .terminal-textbox {
-                    width: 80%;
-                    background: black;
-                    color: #33ff33;
-                    border: 2px solid #33ff33;
-                    padding: 5px;
-                }
-                .terminal-button {
-                    background: black;
-                    color: #ff4444;
-                    border: 2px solid #ff4444;
-                    padding: 5px;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                }
-                .terminal-button:hover {
-                    background: #ff4444;
-                    color: black;
-                    box-shadow: 0 0 10px #ff4444;
-                }
-            `}</style>
         </div>
     );
 }
