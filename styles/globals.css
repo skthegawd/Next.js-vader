@@ -1,16 +1,41 @@
+/* Global Styles */
 body {
     background-color: black;
     color: red;
     font-family: 'Courier New', Courier, monospace;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
 }
 
+/* Sidebar */
 .sidebar {
     background: #222;
     padding: 20px;
+    width: 250px;
+    height: 100vh;
+    color: white;
+    position: fixed;
+    left: 0;
+    top: 0;
+    box-shadow: 2px 0px 10px rgba(255, 0, 0, 0.5);
 }
 
+/* Terminal Aesthetic */
 .terminal {
     background: black;
     border: 1px solid red;
     padding: 20px;
+    color: #0f0;
+    font-size: 16px;
+    font-family: 'Courier New', Courier, monospace;
+    overflow-y: auto;
+    width: 80%;
+    max-width: 600px;
+    height: 400px;
+    box-shadow: 0px 0px 10px rgba(255, 0, 0, 0.3);
 }
