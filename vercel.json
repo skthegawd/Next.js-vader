@@ -13,5 +13,6 @@
     }
   ],
   "outputDirectory": ".next",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "deploymentsEnabled": false
 }
