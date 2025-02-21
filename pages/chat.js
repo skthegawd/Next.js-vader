@@ -18,7 +18,7 @@ export default function Chat() {
 
     const sendMessage = async (text) => {
         if (!text.trim()) return;
-        
+
         const userMessage = { sender: 'user', text };
         setMessages(prev => [...prev, userMessage]);
         setInput('');
@@ -26,11 +26,16 @@ export default function Chat() {
 
         try {
             const response = await sendToAI(text);
-            const botMessage = { sender: 'bot', text: response.reply };
-            setMessages(prev => [...prev, botMessage]);
+            if (response && response.reply) {
+                const botMessage = { sender: 'bot', text: response.reply };
+                setMessages(prev => [...prev, botMessage]);
+            } else {
+                throw new Error("Invalid AI response");
+            }
         } catch (error) {
             setMessages(prev => [...prev, { sender: 'bot', text: '[Error] Unable to process request.' }]);
         }
+
         setLoading(false);
     };
 
@@ -56,8 +61,8 @@ export default function Chat() {
                     <input 
                         type="text" 
                         value={input} 
-                        onChange={(e) => setInput(e.target.value)} 
-                        placeholder="Type your message..." 
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder="Type your message..."
                         onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)}
                     />
                     <button onClick={() => sendMessage(input)}>Send</button>
