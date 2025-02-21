@@ -3,8 +3,7 @@ import { detectWakeword } from '../lib/api';
 
 export default function WakewordListener({ onWakewordDetected }) {
     const [listening, setListening] = useState(false);
-    let mediaRecorder;
-    let audioChunks = [];
+    const [wakewordDetected, setWakewordDetected] = useState(false);
 
     useEffect(() => {
         startListening();
@@ -13,37 +12,38 @@ export default function WakewordListener({ onWakewordDetected }) {
     const startListening = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
+            const audioContext = new AudioContext();
+            const source = audioContext.createMediaStreamSource(stream);
+            const analyser = audioContext.createAnalyser();
+            source.connect(analyser);
+            analyser.fftSize = 512;
 
-            mediaRecorder.ondataavailable = (event) => {
-                audioChunks.push(event.data);
-            };
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
 
-            mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                const detected = await detectWakeword(audioBlob);
-                if (detected.wakeword_detected) {
-                    console.log("🔊 Wakeword Detected!");
-                    if (onWakewordDetected) onWakewordDetected();
-                }
-                audioChunks = [];
-            };
-
-            mediaRecorder.start();
             setListening(true);
 
-            setInterval(() => {
-                mediaRecorder.stop();
-                mediaRecorder.start();
-            }, 5000); // Send every 5 seconds
+            const processAudio = async () => {
+                analyser.getByteFrequencyData(dataArray);
+                const detected = await detectWakeword(dataArray);
+                if (detected.wakeword_detected) {
+                    console.log("🔴 Wakeword Detected!");
+                    setWakewordDetected(true);
+                    if (onWakewordDetected) onWakewordDetected();
+                    setTimeout(() => setWakewordDetected(false), 2000); // Reset visual feedback after 2s
+                }
+                requestAnimationFrame(processAudio);
+            };
+
+            processAudio();
         } catch (error) {
             console.error("Error accessing microphone:", error);
         }
     };
 
     return (
-        <div className="wakeword-container">
-            <p>{listening ? "🎤 Listening for 'Lord Vader'..." : "❌ Not Listening"}</p>
+        <div className={wakewordDetected ? "wakeword-container active" : "wakeword-container"}>
+            <p>{listening ? "🎤 Listening for 'Lord Vader'..." : "🛑 Not Listening"}</p>
         </div>
     );
 }
