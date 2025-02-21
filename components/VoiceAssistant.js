@@ -18,6 +18,8 @@ export default function VoiceAssistant() {
                 if (detected) {
                     console.log("[DEBUG] Wakeword detected!");
                     setWakewordDetected(true);
+                    handleSend("How may I serve you, my master?");
+                    setTimeout(() => setWakewordDetected(false), 2000); // Reset indicator
                 }
             } catch (error) {
                 console.error("[ERROR] Wakeword detection failed:", error);
@@ -26,16 +28,16 @@ export default function VoiceAssistant() {
         listenForWakeword();
     }, []);
 
-    const handleSend = async () => {
-        if (!input.trim()) return;
+    const handleSend = async (text) => {
+        if (!text.trim() || loading) return;
         setLoading(true);
-        const userMessage = `> ${input}`;
+        const userMessage = `> ${text}`;
         setMessages(prev => [...prev, userMessage]);
         setInput('');
 
         try {
             console.log("[DEBUG] Sending request to GPT API...");
-            const response = await sendToAI(input);
+            const response = await sendToAI(text);
             console.log("[DEBUG] GPT API Response:", response);
 
             if (response.error) {
@@ -54,6 +56,7 @@ export default function VoiceAssistant() {
 
     return (
         <div className="terminal">
+            <div className={`wakeword-indicator ${wakewordDetected ? "active" : ""}`}></div>
             <div className="terminal-output">
                 {messages.map((msg, index) => (
                     <p key={index}>{msg}</p>
@@ -65,13 +68,34 @@ export default function VoiceAssistant() {
                     value={input} 
                     onChange={(e) => setInput(e.target.value)} 
                     placeholder="Enter your command..." 
-                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSend(input)}
                     className="terminal-textbox"
+                    disabled={loading}
                 />
-                <button onClick={handleSend} className="terminal-button" disabled={loading}>
+                <button onClick={() => handleSend(input)} className="terminal-button" disabled={loading}>
                     {loading ? 'Processing...' : 'Send'}
                 </button>
             </div>
+            <style jsx>{`
+                .wakeword-indicator {
+                    width: 15px;
+                    height: 15px;
+                    border-radius: 50%;
+                    background: grey;
+                    margin: 10px auto;
+                    transition: background 0.3s;
+                }
+                .wakeword-indicator.active {
+                    background: red;
+                    box-shadow: 0 0 10px red;
+                    animation: pulse 1s infinite;
+                }
+                @keyframes pulse {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                    100% { opacity: 1; }
+                }
+            `}</style>
         </div>
     );
 }
