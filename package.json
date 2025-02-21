@@ -13,6 +13,7 @@
     "react-dom": "latest",
     "axios": "latest",
     "react-speech-recognition": "latest",
-    "regenerator-runtime": "latest"
+    "regenerator-runtime": "latest",
+    "socket.io-client": "^4.7.2"
   }
 }
