@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 import { sendToAI } from '../lib/api';
 import { tts_api_tts, stt_api_stt, wakeword_api_wakeword } from '../lib/voice';
@@ -6,25 +8,33 @@ export default function TerminalUI() {
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState(["Lord Vader, your AI assistant is at your command."]);
     const [loading, setLoading] = useState(false);
-
+    
     const handleSend = async () => {
         if (!input.trim()) return;
         setLoading(true);
         const userMessage = `> ${input}`;
         setMessages(prev => [...prev, userMessage]);
         setInput('');
-
+    
         try {
+            console.log("[DEBUG] Sending request to GPT API...");
             const response = await sendToAI(input);
+            console.log("[DEBUG] GPT API Response:", response);
+            
+            if (response.error) {
+                throw new Error(response.error);
+            }
+            
             setMessages(prev => [...prev, response.reply]);
             await tts_api_tts(response.reply);
         } catch (error) {
+            console.error("[ERROR] GPT API Failed:", error);
             setMessages(prev => [...prev, "[Error] Unable to process command. Try again."]);
         } finally {
             setLoading(false);
         }
     };
-
+    
     return (
         <div className="terminal">
             <div className="terminal-output">
