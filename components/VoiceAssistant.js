@@ -21,6 +21,7 @@ export default function VoiceAssistant({ onTranscribe }) {
             speakResponse(data.reply);
         } catch (error) {
             console.error('Error communicating with AI:', error);
+            setResponse('[Error] Communication failed. Try again.');
         }
         resetTranscript();
     };
@@ -32,11 +33,38 @@ export default function VoiceAssistant({ onTranscribe }) {
 
     return (
         <div className="voice-container">
-            <button onClick={SpeechRecognition.startListening} disabled={listening}>
+            <button onClick={SpeechRecognition.startListening} disabled={listening} className="voice-button">
                 🎤 {listening ? 'Listening...' : 'Start Voice Command'}
             </button>
-            <p>🗣 {transcript}</p>
-            <p>🤖 {response}</p>
+            <p className="voice-transcript">🗣 {transcript}</p>
+            <p className="voice-response">🤖 {response}</p>
+            <style jsx>{`
+                .voice-container {
+                    text-align: center;
+                    padding: 20px;
+                    background: black;
+                    color: #ff4444;
+                    font-family: 'Star Jedi', sans-serif;
+                }
+                .voice-button {
+                    background: black;
+                    color: #ff4444;
+                    border: 2px solid #ff4444;
+                    padding: 10px;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                }
+                .voice-button:hover {
+                    background: #ff4444;
+                    color: black;
+                    box-shadow: 0 0 10px #ff4444;
+                }
+                .voice-transcript, .voice-response {
+                    font-size: 18px;
+                    margin-top: 10px;
+                    text-shadow: 0 0 5px red;
+                }
+            `}</style>
         </div>
     );
 }
