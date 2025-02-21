@@ -1,8 +1,14 @@
 export const connectToDevice = async () => {
+    if (!navigator.bluetooth) {
+        console.error("Web Bluetooth is not supported in this browser.");
+        return "Bluetooth not supported in this browser.";
+    }
+
     try {
         console.log("Requesting Bluetooth Device...");
         const device = await navigator.bluetooth.requestDevice({
-            acceptAllDevices: true,
+            acceptAllDevices: false,
+            filters: [{ services: ['battery_service'] }],
             optionalServices: ['battery_service']
         });
 
@@ -23,6 +29,6 @@ export const connectToDevice = async () => {
         return `Connected to ${device.name} | Battery: ${batteryLevel}%`;
     } catch (error) {
         console.error("Bluetooth connection failed:", error);
-        return "Bluetooth connection failed.";
+        return "Bluetooth connection failed. Please try again.";
     }
 };
