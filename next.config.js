@@ -24,12 +24,8 @@ module.exports = {
         ];
     },
 
-    // Ensures assets are served correctly
-    assetPrefix: process.env.NEXT_PUBLIC_ASSET_PREFIX || "",
-
-    // Optimizes for Vercel deployment
+    // ✅ Removed `optimizeImages`, which was causing the error
     experimental: {
-        optimizeCss: true, // Minifies CSS for better performance
-        optimizeImages: true, // Optimizes images with Next.js built-in optimization
+        optimizeCss: true, // Keeps CSS optimization enabled for better performance
     },
 };
