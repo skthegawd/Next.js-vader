@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "node server.js"  // ✅ Uses Express to serve static files properly
   },
   "dependencies": {
+    "express": "latest",  // ✅ Required for serving Next.js static files
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
