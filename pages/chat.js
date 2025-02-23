@@ -16,18 +16,32 @@ export default function Chat() {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    const sendMessage = async () => {
-        if (!input.trim() || loading) return; // Prevent empty input and multiple requests
+    // ✅ Get or Create Session ID for AI Requests
+    const getSessionId = () => {
+        let sessionId = localStorage.getItem("session_id");
+        if (!sessionId) {
+            sessionId = `session_${Date.now()}`;
+            localStorage.setItem("session_id", sessionId);
+        }
+        return sessionId;
+    };
 
-        const userMessage = { sender: 'user', text: input };
+    // ✅ Send Message to AI Backend
+    const sendMessage = async (messageText) => {
+        if (!messageText.trim() || loading) return; // Prevent empty input and multiple requests
+
+        const userMessage = { sender: 'user', text: messageText };
         setMessages(prev => [...prev, userMessage]);
         setInput('');
         setLoading(true);
 
         try {
-            const response = await sendToAI(input);
-            if (response && response.reply) {
-                const botMessage = { sender: 'bot', text: response.reply };
+            // ✅ Ensure session_id is included in the API request
+            const session_id = getSessionId();
+            const response = await sendToAI(messageText, session_id);
+
+            if (response && response.response) { // ✅ Fix: Use `response.response` instead of `response.reply`
+                const botMessage = { sender: 'bot', text: response.response };
                 setMessages(prev => [...prev, botMessage]);
             } else {
                 throw new Error("Invalid AI response");
@@ -63,13 +77,14 @@ export default function Chat() {
                         value={input} 
                         onChange={(e) => setInput(e.target.value)}
                         placeholder="Type your message..."
-                        onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                        onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)}
                         disabled={loading}
                     />
-                    <button onClick={sendMessage} disabled={loading}>
+                    <button onClick={() => sendMessage(input)} disabled={loading}>
                         {loading ? 'Processing...' : 'Send'}
                     </button>
                 </div>
+                {/* ✅ Fix: Pass transcription text correctly */}
                 <VoiceAssistant onTranscribe={(transcription) => sendMessage(transcription)} />
                 <WakewordListener onWakewordDetected={() => sendMessage("How may I serve you, my master?")} />
             </main>
