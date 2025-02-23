@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { detectWakeword } from '../lib/api';
+import { detectWakeword } from '../lib/api'; // ✅ Fixed Import Statement
 
 export default function WakewordListener({ onWakewordDetected }) {
     const [listening, setListening] = useState(false);
@@ -33,14 +33,14 @@ export default function WakewordListener({ onWakewordDetected }) {
         startListening();
 
         return () => {
-            isMounted = false; // Cleanup function to avoid memory leaks
+            isMounted = false; // Cleanup function to prevent memory leaks
         };
     }, [onWakewordDetected]);
 
     return (
         <div className={`wakeword-container ${wakewordDetected ? "active" : ""}`}>
             <p>
-                {listening ? "🎙️ Listening for 'Lord Vader'..." : "⏸️ Not Listening"}
+                {listening ? "🎙️ Listening for 'Lord Vader'..." : "🔴 Not Listening"}
             </p>
             {error && <p className="error">{error}</p>}
             <style jsx>{`
