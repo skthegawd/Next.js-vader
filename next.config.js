@@ -21,10 +21,23 @@ module.exports = {
                     },
                 ],
             },
+            // ✅ Ensures static assets are served correctly
+            {
+                source: "/_next/static/:path*",
+                headers: [
+                    {
+                        key: "Cache-Control",
+                        value: "public, max-age=31536000, immutable",
+                    },
+                    {
+                        key: "Content-Type",
+                        value: "application/javascript",
+                    },
+                ],
+            },
         ];
     },
 
-    // ✅ Removed `optimizeImages`, which was causing the error
     experimental: {
         optimizeCss: true, // Keeps CSS optimization enabled for better performance
     },
