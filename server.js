@@ -10,7 +10,7 @@ app.prepare().then(() => {
   const server = express();
 
   // ✅ Serve Next.js Static Files
-  server.use("/_next", express.static(".next"));
+  server.use("/_next", express.static(".next/static"));
 
   // ✅ Handle All Other Routes with Next.js
   server.all("*", (req, res) => {
