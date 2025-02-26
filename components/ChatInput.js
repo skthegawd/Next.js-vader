@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { sendToAI } from "../lib/api";
 
-const ChatInput = ({ onMessageSent }) => {
+const ChatInput = ({ onMessageSend }) => {
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
 
@@ -10,9 +10,10 @@ const ChatInput = ({ onMessageSent }) => {
         setLoading(true);
 
         try {
+            console.log("[DEBUG] Sending message to API:", input);
             const response = await sendToAI(input);
-            if (onMessageSent) {
-                onMessageSent({ text: input, response: response.response });
+            if (onMessageSend) {
+                onMessageSend({ text: input, response: response.response });
             }
         } catch (error) {
             console.error("Error sending message:", error);
