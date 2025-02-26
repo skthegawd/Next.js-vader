@@ -5,15 +5,15 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "node server.js"  // ✅ Uses Express to serve static files properly
+    "start": "node server.js"
   },
   "dependencies": {
-    "express": "latest",  // ✅ Required for serving Next.js static files
+    "express": "latest",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
     "axios": "latest",
-    "critters": "^0.0.19", 
+    "critters": "^0.0.19",
     "react-speech-recognition": "latest",
     "regenerator-runtime": "latest",
     "socket.io-client": "^4.7.2"
