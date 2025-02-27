@@ -11,12 +11,16 @@ const ChatInput = ({ onMessageSend }) => {
 
         try {
             console.log("[DEBUG] Sending message to API:", input);
+            
             const response = await sendToAI(input);
+            
+            console.log("[DEBUG] API Response:", response);
+
             if (onMessageSend) {
                 onMessageSend({ text: input, response: response.response });
             }
         } catch (error) {
-            console.error("Error sending message:", error);
+            console.error("[ERROR] API request failed:", error);
         }
 
         setInput("");
