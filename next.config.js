@@ -21,7 +21,7 @@ module.exports = {
                     },
                 ],
             },
-            // ✅ Ensures static assets are served correctly
+            // ✅ Ensures static assets are served correctly as JavaScript
             {
                 source: "/_next/static/:path*",
                 headers: [
@@ -39,6 +39,6 @@ module.exports = {
     },
 
     experimental: {
-        optimizeCss: true, // Keeps CSS optimization enabled for better performance
+        optimizeCss: true, // ✅ Enables Next.js CSS optimization for better performance
     },
 };
