@@ -5,17 +5,17 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "node server.js"
+    "start": "next start"
   },
   "dependencies": {
-    "express": "latest",
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "axios": "latest",
-    "critters": "^0.0.19",
-    "react-speech-recognition": "latest",
-    "regenerator-runtime": "latest",
-    "socket.io-client": "^4.7.2"
+    "axios": "^0.27.2",
+    "dotenv": "^16.0.3",
+    "next": "^12.3.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.19.0",
+    "eslint-config-next": "^12.3.1"
   }
 }
