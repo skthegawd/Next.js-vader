@@ -1,6 +1,6 @@
-import "regenerator-runtime/runtime"; // Ensure support for async functions
-import '../styles/globals.css';
-import Layout from '../components/Layout';
+import "regenerator-runtime/runtime";
+import "../styles/globals.css";  // ✅ Moved global CSS here
+import Layout from "../components/Layout";
 
 // Log API Base URL for debugging
 console.log("Next.js Backend API:", process.env.NEXT_PUBLIC_BACKEND_URL);
