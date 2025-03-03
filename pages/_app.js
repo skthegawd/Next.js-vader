@@ -1,4 +1,4 @@
-import "regenerator-runtime/runtime";
+import "regenerator-runtime/runtime"; // Ensure support for async functions
 import '../styles/globals.css';
 import Layout from '../components/Layout';
 
