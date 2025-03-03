@@ -1,7 +1,6 @@
-import Head from 'next/head';
-import Sidebar from '../components/Sidebar';
-import TerminalUI from '../components/TerminalUI';
-import styles from '../styles/globals.css';
+import Head from "next/head";
+import Sidebar from "../components/Sidebar";
+import TerminalUI from "../components/TerminalUI";
 
 export default function Home() {
     return (
