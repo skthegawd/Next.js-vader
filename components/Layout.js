@@ -6,7 +6,7 @@ export default function Layout({ children }) {
         <>
             <Head>
                 <meta charSet="UTF-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
                 <meta name="description" content="Vader AI - Your Personal Sith Assistant" />
                 <title>Vader AI</title>
                 <link href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap" rel="stylesheet" />
@@ -30,7 +30,7 @@ export default function Layout({ children }) {
                     flex-grow: 1;
                     padding: 20px;
                     text-shadow: 0 0 10px red;
-                    overflow-y: auto;
+                    overflow-y: auto; /* Ensures content scrolls */
                     max-height: 100vh;
                 }
             `}</style>
