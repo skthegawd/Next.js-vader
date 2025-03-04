@@ -1,53 +1,69 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { getAuthTokenFromAPI, registerUser, refreshToken } from "../lib/api";
+import { createContext, useState, useEffect } from 'react';
+import { registerUser, getAuthTokenFromAPI, refreshToken } from '../lib/api';
 
-const AuthContext = createContext(null);
+export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-    const [token, setToken] = useState(localStorage.getItem("vader_auth_token"));
-    const [user, setUser] = useState(localStorage.getItem("vader_user_id") || null);
-    const [loading, setLoading] = useState(true);
+    const [token, setToken] = useState(null);
+    const [userId, setUserId] = useState(null);
 
     useEffect(() => {
-        const checkAuth = async () => {
-            if (!token) {
-                console.warn("[WARNING] No token found, attempting registration...");
-                let userId = localStorage.getItem("vader_user_id");
-                if (!userId) {
-                    userId = `user_${Date.now()}`;
-                    localStorage.setItem("vader_user_id", userId);
-                }
-                await registerUser(userId);
-                const newToken = await getAuthTokenFromAPI(userId);
-                if (newToken) setToken(newToken);
+        if (typeof window !== 'undefined') {
+            const storedUserId = localStorage.getItem("vader_user_id");
+            const storedToken = localStorage.getItem("vader_auth_token");
+
+            if (storedUserId) {
+                setUserId(storedUserId);
             }
-            setLoading(false);
-        };
-        checkAuth();
+            
+            if (storedToken) {
+                setToken(storedToken);
+            } else if (storedUserId) {
+                authenticateUser(storedUserId);
+            } else {
+                const newUserId = `user_${Date.now()}`;
+                registerUser(newUserId).then(() => {
+                    localStorage.setItem("vader_user_id", newUserId);
+                    setUserId(newUserId);
+                    authenticateUser(newUserId);
+                });
+            }
+        }
     }, []);
 
-    const login = async (userId) => {
-        const newToken = await getAuthTokenFromAPI(userId);
-        if (newToken) {
-            setToken(newToken);
-            setUser(userId);
-            localStorage.setItem("vader_auth_token", newToken);
-            localStorage.setItem("vader_user_id", userId);
+    const authenticateUser = async (userId) => {
+        try {
+            const newToken = await getAuthTokenFromAPI(userId);
+            if (newToken) {
+                localStorage.setItem("vader_auth_token", newToken);
+                setToken(newToken);
+            }
+        } catch (error) {
+            console.error("Authentication failed:", error);
         }
     };
 
-    const logout = () => {
-        localStorage.removeItem("vader_auth_token");
-        localStorage.removeItem("vader_user_id");
-        setToken(null);
-        setUser(null);
-    };
+    useEffect(() => {
+        const interval = setInterval(async () => {
+            if (userId) {
+                try {
+                    const refreshedToken = await refreshToken();
+                    if (refreshedToken) {
+                        localStorage.setItem("vader_auth_token", refreshedToken);
+                        setToken(refreshedToken);
+                    }
+                } catch (error) {
+                    console.error("Token refresh failed:", error);
+                }
+            }
+        }, 15 * 60 * 1000); // Refresh token every 15 minutes
+
+        return () => clearInterval(interval);
+    }, [userId]);
 
     return (
-        <AuthContext.Provider value={{ token, user, login, logout, loading }}>
+        <AuthContext.Provider value={{ token, userId }}>
             {children}
         </AuthContext.Provider>
     );
 };
-
-export const useAuth = () => useContext(AuthContext);
