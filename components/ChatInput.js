@@ -11,9 +11,8 @@ const ChatInput = ({ onMessageSend }) => {
 
         try {
             console.log("[DEBUG] Sending message to API:", input);
-            
+
             const response = await sendToAI(input);
-            
             console.log("[DEBUG] API Response:", response);
 
             if (onMessageSend) {
@@ -38,7 +37,7 @@ const ChatInput = ({ onMessageSend }) => {
                 placeholder="Type a message..."
                 disabled={loading}
             />
-            <button onClick={handleSendMessage} disabled={loading}>
+            <button onClick={handleSendMessage} disabled={!input.trim() || loading}>
                 {loading ? "Sending..." : "Send"}
             </button>
         </div>
