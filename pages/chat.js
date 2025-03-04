@@ -1,22 +1,39 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import { authorizedRequest } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import Layout from "../components/Layout";
+import ChatInput from "../components/ChatInput";
 
 const Chat = () => {
+    const { token, loading } = useAuth();
     const [messages, setMessages] = useState([]);
 
     useEffect(() => {
-        axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/messages`)
-            .then(response => setMessages(response.data))
-            .catch(error => console.error("Error fetching messages:", error));
-    }, []);
+        if (!token || loading) return;
+        const fetchMessages = async () => {
+            try {
+                const data = await authorizedRequest("GET", "/messages");
+                setMessages(data);
+            } catch (error) {
+                console.error("[ERROR] Fetching messages failed:", error);
+            }
+        };
+        fetchMessages();
+    }, [token, loading]);
+
+    const handleNewMessage = (message) => {
+        setMessages([...messages, message]);
+    };
 
     return (
         <Layout>
             <div className="chat-container">
-                {messages.map((msg, index) => (
-                    <div key={index} className="message">{msg.text}</div>
-                ))}
+                <div className="messages">
+                    {messages.map((msg, index) => (
+                        <div key={index} className="message">{msg.text}</div>
+                    ))}
+                </div>
+                <ChatInput onMessageSend={handleNewMessage} />
             </div>
         </Layout>
     );
