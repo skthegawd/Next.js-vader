@@ -1,23 +1,25 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { getAuthToken, loginUser, logoutUser, refreshToken } from "../lib/auth";
+import { getAuthTokenFromAPI, registerUser, refreshToken } from "../lib/api";
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-    const [token, setToken] = useState(getAuthToken());
-    const [user, setUser] = useState(localStorage.getItem("user_id") || null);
+    const [token, setToken] = useState(localStorage.getItem("vader_auth_token"));
+    const [user, setUser] = useState(localStorage.getItem("vader_user_id") || null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const checkAuth = async () => {
             if (!token) {
-                console.log("No token found, attempting refresh...");
-                const newToken = await refreshToken();
-                if (newToken) {
-                    setToken(newToken);
-                } else {
-                    logout();
+                console.warn("[WARNING] No token found, attempting registration...");
+                let userId = localStorage.getItem("vader_user_id");
+                if (!userId) {
+                    userId = `user_${Date.now()}`;
+                    localStorage.setItem("vader_user_id", userId);
                 }
+                await registerUser(userId);
+                const newToken = await getAuthTokenFromAPI(userId);
+                if (newToken) setToken(newToken);
             }
             setLoading(false);
         };
@@ -25,15 +27,18 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const login = async (userId) => {
-        const newToken = await loginUser(userId);
+        const newToken = await getAuthTokenFromAPI(userId);
         if (newToken) {
             setToken(newToken);
             setUser(userId);
+            localStorage.setItem("vader_auth_token", newToken);
+            localStorage.setItem("vader_user_id", userId);
         }
     };
 
     const logout = () => {
-        logoutUser();
+        localStorage.removeItem("vader_auth_token");
+        localStorage.removeItem("vader_user_id");
         setToken(null);
         setUser(null);
     };
