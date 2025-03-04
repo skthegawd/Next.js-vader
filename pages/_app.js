@@ -1,15 +1,14 @@
-import "regenerator-runtime/runtime";
-import "../styles/globals.css";  // ✅ Moved global CSS here
+import "../styles/globals.css";  // Global styles
 import Layout from "../components/Layout";
-
-// Log API Base URL for debugging
-console.log("Next.js Backend API:", process.env.NEXT_PUBLIC_BACKEND_URL);
+import { AuthProvider } from "../context/AuthContext";
 
 function MyApp({ Component, pageProps }) {
     return (
-        <Layout>
-            <Component {...pageProps} />
-        </Layout>
+        <AuthProvider>
+            <Layout>
+                <Component {...pageProps} />
+            </Layout>
+        </AuthProvider>
     );
 }
 
