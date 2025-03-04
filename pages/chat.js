@@ -1,39 +1,41 @@
 import { useEffect, useState } from "react";
-import { authorizedRequest } from "../lib/api";
-import { useAuth } from "../context/AuthContext";
+import { authorizedRequest, registerUser, getAuthTokenFromAPI } from "../lib/api";
 import Layout from "../components/Layout";
-import ChatInput from "../components/ChatInput";
 
 const Chat = () => {
-    const { token, loading } = useAuth();
     const [messages, setMessages] = useState([]);
 
     useEffect(() => {
-        if (!token || loading) return;
-        const fetchMessages = async () => {
-            try {
-                const data = await authorizedRequest("GET", "/messages");
-                setMessages(data);
-            } catch (error) {
-                console.error("[ERROR] Fetching messages failed:", error);
+        const initializeUser = async () => {
+            let userId = localStorage.getItem("vader_user_id");
+            if (!userId) {
+                const newUser = await registerUser("anonymous_user");
+                if (newUser?.user_id) {
+                    userId = newUser.user_id;
+                    localStorage.setItem("vader_user_id", userId);
+                }
+            }
+            let token = localStorage.getItem("vader_auth_token");
+            if (!token) {
+                token = await getAuthTokenFromAPI(userId);
             }
         };
-        fetchMessages();
-    }, [token, loading]);
 
-    const handleNewMessage = (message) => {
-        setMessages([...messages, message]);
-    };
+        initializeUser();
+    }, []);
+
+    useEffect(() => {
+        authorizedRequest("GET", "/messages")
+            .then(response => setMessages(response))
+            .catch(error => console.error("Error fetching messages:", error));
+    }, []);
 
     return (
         <Layout>
             <div className="chat-container">
-                <div className="messages">
-                    {messages.map((msg, index) => (
-                        <div key={index} className="message">{msg.text}</div>
-                    ))}
-                </div>
-                <ChatInput onMessageSend={handleNewMessage} />
+                {messages.map((msg, index) => (
+                    <div key={index} className="message">{msg.text}</div>
+                ))}
             </div>
         </Layout>
     );
