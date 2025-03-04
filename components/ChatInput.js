@@ -1,10 +1,22 @@
 import { useState } from "react";
 import { sendToAI } from "../lib/api";
-import { ensureAuthenticated } from "../lib/auth";
+import { registerUser, getAuthTokenFromAPI } from "../lib/api";
 
 const ChatInput = ({ onMessageSend }) => {
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
+
+    const ensureAuthenticated = async () => {
+        let token = localStorage.getItem("vader_auth_token");
+        if (!token) {
+            console.warn("[WARNING] No token found, registering user...");
+            const userId = localStorage.getItem("vader_user_id") || `user_${Date.now()}`;
+            localStorage.setItem("vader_user_id", userId);
+            await registerUser(userId);
+            token = await getAuthTokenFromAPI(userId);
+        }
+        return token;
+    };
 
     const handleSendMessage = async () => {
         if (!input.trim()) return;
@@ -14,7 +26,7 @@ const ChatInput = ({ onMessageSend }) => {
             console.log("[DEBUG] Authenticating user...");
             const token = await ensureAuthenticated();
             if (!token) {
-                console.error("[ERROR] Authentication failed. No token found.");
+                console.error("[ERROR] Authentication failed. No token available.");
                 setLoading(false);
                 return;
             }
