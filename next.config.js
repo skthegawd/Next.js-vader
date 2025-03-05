@@ -20,6 +20,9 @@ module.exports = {
                         key: "Access-Control-Allow-Origin",
                         value: "*",
                     },
+                    { 
+                        key: "Content-Type", value: "application/javascript" ,
+                    },
                     {
                         key: "Access-Control-Allow-Methods",
                         value: "GET, POST, PUT, DELETE, OPTIONS",
