@@ -37,6 +37,15 @@ module.exports = {
         ];
     },
 
+    async rewrites() {
+        return [
+            {
+                source: "/api/:path*",  // Forward all /api/* calls
+                destination: "https://vader-yp5n.onrender.com/api/:path*",
+            },
+        ];
+    },
+
     experimental: {
         optimizeCss: false, // Temporary fix for Google Fonts issue
     },
