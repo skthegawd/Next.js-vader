@@ -6,19 +6,37 @@ const ChatInput = ({ onMessageSend }) => {
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
 
+    // Function to ensure user is authenticated
     const ensureAuthenticated = async () => {
         let token = localStorage.getItem("vader_auth_token");
+
         if (!token) {
             console.warn("[WARNING] No token found, registering user...");
             const userId = localStorage.getItem("vader_user_id") || `user_${Date.now()}`;
             localStorage.setItem("vader_user_id", userId);
-            await registerUser(userId);
-            token = await getAuthTokenFromAPI(userId);
+
+            try {
+                await registerUser(userId);
+                token = await getAuthTokenFromAPI(userId);
+                if (token) {
+                    localStorage.setItem("vader_auth_token", token);
+                    console.log("[DEBUG] User authenticated successfully.");
+                } else {
+                    console.error("[ERROR] Failed to fetch authentication token.");
+                    return null;
+                }
+            } catch (error) {
+                console.error("[ERROR] Authentication process failed:", error);
+                return null;
+            }
         }
         return token;
     };
 
+    // Function to send a message
     const handleSendMessage = async () => {
+        console.log("[DEBUG] Button Clicked");
+        
         if (!input.trim()) return;
         setLoading(true);
 
@@ -36,7 +54,7 @@ const ChatInput = ({ onMessageSend }) => {
             console.log("[DEBUG] API Response:", response);
 
             if (onMessageSend) {
-                onMessageSend({ text: input, response: response.response });
+                onMessageSend({ text: input, response: response?.response });
             }
         } catch (error) {
             console.error("[ERROR] API request failed:", error);
