@@ -1,38 +1,10 @@
 import { useState } from "react";
 import { sendToAI } from "../lib/api";
-import { registerUser, getAuthTokenFromAPI } from "../lib/api";
 
 const ChatInput = ({ onMessageSend }) => {
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-
-    // Function to ensure user is authenticated
-    const ensureAuthenticated = async () => {
-        let token = localStorage.getItem("vader_auth_token");
-
-        if (!token) {
-            console.warn("[WARNING] No token found, registering user...");
-            const userId = localStorage.getItem("vader_user_id") || `user_${Date.now()}`;
-            localStorage.setItem("vader_user_id", userId);
-
-            try {
-                await registerUser(userId);
-                token = await getAuthTokenFromAPI(userId);
-                if (token) {
-                    localStorage.setItem("vader_auth_token", token);
-                    console.log("[DEBUG] User authenticated successfully.");
-                } else {
-                    console.error("[ERROR] Failed to fetch authentication token.");
-                    return null;
-                }
-            } catch (error) {
-                console.error("[ERROR] Authentication process failed:", error);
-                return null;
-            }
-        }
-        return token;
-    };
 
     // Function to send a message
     const handleSendMessage = async () => {
@@ -44,6 +16,8 @@ const ChatInput = ({ onMessageSend }) => {
         try {
             console.log("[DEBUG] Sending message to API:", input);
             const response = await sendToAI(input);
+            
+            console.log("[DEBUG] Received response:", response);
             
             if (response && response.response) {
                 if (onMessageSend) {
