@@ -1,37 +1,5 @@
-import axios, { AxiosInstance, AxiosResponse } from 'axios';
-
-interface ApiConfig {
-  baseUrl: string;
-  headers?: Record<string, string>;
-}
-
-interface ApiResponse<T = any> {
-  data: T;
-  status: number;
-  message?: string;
-}
-
-interface SessionData {
-  clientId: string;
-  features: {
-    websocket: boolean;
-    streaming: boolean;
-    codeAnalysis: boolean;
-  };
-  limits: {
-    maxTokens: number;
-    rateLimit: number;
-  };
-}
-
-interface ThemeData {
-  name: string;
-  colors: Record<string, string>;
-  fonts: {
-    primary: string;
-    secondary: string;
-  };
-}
+import axios, { AxiosInstance } from 'axios';
+import type { ApiConfig, ApiResponse, SessionData, ThemeData } from './types';
 
 export class ApiError extends Error {
   constructor(
@@ -44,7 +12,7 @@ export class ApiError extends Error {
   }
 }
 
-class ApiClient {
+export class ApiClient {
   private axios: AxiosInstance;
   private baseUrl: string;
 
@@ -60,7 +28,6 @@ class ApiClient {
       withCredentials: true,
     });
 
-    // Add response interceptor for error handling
     this.axios.interceptors.response.use(
       (response) => response,
       (error) => {
@@ -122,7 +89,6 @@ class ApiClient {
     }
   }
 
-  // Legacy API methods
   async sendToAI(
     message: string,
     options: {
@@ -151,10 +117,13 @@ class ApiClient {
   }
 }
 
-// Create and export the API client instance
-export const api = new ApiClient({
+// Create the API client instance
+const apiClient = new ApiClient({
   baseUrl: process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com',
   headers: {
     'X-Platform': 'web',
   },
-}); 
+});
+
+// Export both the class and the instance
+export { apiClient as api }; 

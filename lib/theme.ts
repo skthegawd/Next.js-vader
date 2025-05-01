@@ -1,4 +1,5 @@
 import { api } from './api';
+import type { ThemeData } from './types';
 
 interface ThemeColors {
   primary: string;
@@ -24,7 +25,7 @@ interface ThemeConfig {
   };
 }
 
-class ThemeManager {
+export class ThemeManager {
   private currentTheme: ThemeConfig | null = null;
 
   async initialize(): Promise<void> {
@@ -38,7 +39,7 @@ class ThemeManager {
     }
   }
 
-  private processThemeData(data: any): ThemeConfig {
+  private processThemeData(data: ThemeData): ThemeConfig {
     return {
       name: data.name,
       colors: {
@@ -51,14 +52,14 @@ class ThemeManager {
       },
       fonts: {
         primary: {
-          family: data.fonts.primary.family || 'system-ui',
-          weight: data.fonts.primary.weight || 400,
-          size: data.fonts.primary.size || '16px',
+          family: data.fonts.primary || 'system-ui',
+          weight: 400,
+          size: '16px',
         },
         secondary: {
-          family: data.fonts.secondary.family || 'system-ui',
-          weight: data.fonts.secondary.weight || 400,
-          size: data.fonts.secondary.size || '14px',
+          family: data.fonts.secondary || 'system-ui',
+          weight: 400,
+          size: '14px',
         },
       },
     };
