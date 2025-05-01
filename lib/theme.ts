@@ -1,4 +1,4 @@
-import { api, ApiClient } from './api';
+import api from './api';
 import type { ThemeData } from './types';
 
 interface ThemeColors {

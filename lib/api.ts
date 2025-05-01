@@ -12,7 +12,7 @@ export class ApiError extends Error {
   }
 }
 
-export class ApiClient {
+class ApiClient {
   private axios: AxiosInstance;
   private baseUrl: string;
 
@@ -117,13 +117,12 @@ export class ApiClient {
   }
 }
 
-// Create and export the singleton instance
-export const api = new ApiClient({
+// Create and export the default instance
+const api = new ApiClient({
   baseUrl: process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com',
   headers: {
     'X-Platform': 'web',
   },
 });
 
-// Export the class for type usage
-export { ApiClient, ApiError }; 
+export default api; 
