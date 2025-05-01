@@ -54,11 +54,25 @@ export default function Chat() {
                 // Play audio if available
                 if (response.tts_audio) {
                     try {
+                        console.log('[DEBUG] Playing TTS audio from URL:', response.tts_audio);
                         const audio = new Audio(response.tts_audio);
+                        audio.onerror = (e) => {
+                            console.error('[ERROR] Audio playback error:', e);
+                        };
+                        audio.onloadstart = () => {
+                            console.log('[DEBUG] Audio started loading');
+                        };
+                        audio.oncanplay = () => {
+                            console.log('[DEBUG] Audio ready to play');
+                        };
                         await audio.play();
+                        console.log('[DEBUG] Audio playback started successfully');
                     } catch (audioError) {
                         console.error('[ERROR] Failed to play audio:', audioError);
+                        console.error('[ERROR] Audio URL was:', response.tts_audio);
                     }
+                } else {
+                    console.log('[DEBUG] No TTS audio URL provided in response');
                 }
             }
         } catch (error) {
@@ -95,11 +109,22 @@ export default function Chat() {
                                         <div className="message-text">{msg.text}</div>
                                         {msg.type === 'ai' && msg.audioUrl && (
                                             <div className="audio-controls">
-                                                <audio controls src={msg.audioUrl}>
+                                                <audio 
+                                                    controls 
+                                                    src={msg.audioUrl}
+                                                    preload="metadata"
+                                                    onError={(e) => {
+                                                        console.error('[ERROR] Audio element error:', e);
+                                                        e.target.parentElement.innerHTML = 'Audio playback failed. Click message to try again.';
+                                                    }}
+                                                >
                                                     Your browser does not support the audio element.
                                                 </audio>
                                             </div>
                                         )}
+                                        <div className="message-timestamp">
+                                            {new Date(msg.timestamp).toLocaleTimeString()}
+                                        </div>
                                     </div>
                                 </div>
                             ))
@@ -238,8 +263,16 @@ export default function Chat() {
                     animation: fadeIn 0.3s ease;
                 }
 
+                .message-timestamp {
+                    font-size: 12px;
+                    color: rgba(255, 255, 255, 0.5);
+                    margin-top: 5px;
+                    text-align: right;
+                }
+
                 .audio-controls {
                     margin-top: 15px;
+                    position: relative;
                 }
 
                 .audio-controls audio {
@@ -247,6 +280,25 @@ export default function Chat() {
                     height: 40px;
                     border-radius: 20px;
                     background: rgba(0, 0, 0, 0.3);
+                    outline: none;
+                }
+
+                .audio-controls audio::-webkit-media-controls-panel {
+                    background: rgba(0, 0, 0, 0.5);
+                }
+
+                .audio-controls audio::-webkit-media-controls-current-time-display,
+                .audio-controls audio::-webkit-media-controls-time-remaining-display {
+                    color: #ffffff;
+                }
+
+                .audio-controls audio::-webkit-media-controls-play-button,
+                .audio-controls audio::-webkit-media-controls-mute-button {
+                    filter: invert(1);
+                }
+
+                .audio-controls audio::-webkit-media-controls-timeline {
+                    background-color: rgba(255, 0, 0, 0.3);
                 }
 
                 .input-container {
