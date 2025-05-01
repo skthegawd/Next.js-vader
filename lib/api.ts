@@ -12,7 +12,7 @@ export class ApiError extends Error {
   }
 }
 
-class ApiClient {
+export class ApiClient {
   private static instance: ApiClient;
   private axios: AxiosInstance;
   private baseUrl: string;
@@ -131,5 +131,4 @@ class ApiClient {
 }
 
 // Export the singleton instance
-const api = ApiClient.getInstance();
-export default api; 
+export const api = ApiClient.getInstance(); 
