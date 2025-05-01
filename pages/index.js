@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import Link from 'next/link';
+import MobileNav from '../components/MobileNav';
 
 export default function Home() {
     const [isLoaded, setIsLoaded] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     useEffect(() => {
         setIsLoaded(true);
@@ -12,6 +14,20 @@ export default function Home() {
     return (
         <Layout title="Welcome to the Dark Side">
             <div className={`landing-container ${isLoaded ? 'loaded' : ''}`}>
+                <button 
+                    className="hamburger" 
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    aria-label="Toggle menu"
+                >
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+
+                <div className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
+                    {/* Sidebar content */}
+                </div>
+
                 <div className="content">
                     <h1 className="title">Welcome to the Dark Side</h1>
                     <div className="description">
@@ -35,11 +51,12 @@ export default function Home() {
                     </div>
                 </div>
                 <div className="background-animation"></div>
+                <MobileNav />
             </div>
 
             <style jsx>{`
                 .landing-container {
-                    height: calc(100vh - 40px);
+                    height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
                     display: flex;
                     justify-content: center;
                     align-items: center;
@@ -48,6 +65,7 @@ export default function Home() {
                     opacity: 0;
                     transform: translateY(20px);
                     transition: opacity 0.5s ease, transform 0.5s ease;
+                    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
                 }
 
                 .landing-container.loaded {
@@ -66,6 +84,8 @@ export default function Home() {
                     box-shadow: 0 0 30px rgba(255, 0, 0, 0.3);
                     max-width: 800px;
                     width: 90%;
+                    backdrop-filter: blur(10px);
+                    -webkit-backdrop-filter: blur(10px);
                 }
 
                 .title {
@@ -97,6 +117,8 @@ export default function Home() {
                     background: rgba(255, 0, 0, 0.1);
                     border-radius: 8px;
                     transition: transform 0.3s ease, box-shadow 0.3s ease;
+                    backdrop-filter: blur(5px);
+                    -webkit-backdrop-filter: blur(5px);
                 }
 
                 .feature:hover {
@@ -118,13 +140,18 @@ export default function Home() {
 
                 .feature-link {
                     display: inline-block;
-                    padding: 10px 20px;
+                    padding: 15px 25px;
                     background: rgba(255, 0, 0, 0.8);
                     color: white;
                     text-decoration: none;
                     border-radius: 5px;
                     transition: all 0.3s ease;
                     cursor: pointer;
+                    min-height: 44px;
+                    min-width: 44px;
+                    user-select: none;
+                    -webkit-user-select: none;
+                    touch-action: manipulation;
                 }
 
                 .feature-link:hover {
@@ -133,8 +160,13 @@ export default function Home() {
                     box-shadow: 0 2px 8px rgba(255, 0, 0, 0.4);
                 }
 
+                .feature-link:active {
+                    transform: translateY(0);
+                    box-shadow: 0 1px 4px rgba(255, 0, 0, 0.2);
+                }
+
                 .background-animation {
-                    position: absolute;
+                    position: fixed;
                     top: 0;
                     left: 0;
                     right: 0;
@@ -146,6 +178,28 @@ export default function Home() {
                     background-size: 100% 100%, 4px 4px, 4px 4px;
                     animation: backgroundMove 20s linear infinite;
                     z-index: 0;
+                    pointer-events: none;
+                }
+
+                .hamburger {
+                    display: none;
+                    position: fixed;
+                    top: calc(20px + env(safe-area-inset-top));
+                    right: 20px;
+                    z-index: 1001;
+                    background: transparent;
+                    border: none;
+                    padding: 15px;
+                    cursor: pointer;
+                }
+
+                .hamburger span {
+                    display: block;
+                    width: 25px;
+                    height: 2px;
+                    background: #ff0000;
+                    margin: 5px 0;
+                    transition: 0.3s;
                 }
 
                 @keyframes backgroundMove {
@@ -158,8 +212,26 @@ export default function Home() {
                 }
 
                 @media (max-width: 768px) {
+                    .landing-container {
+                        padding: 0;
+                        height: 100%;
+                        min-height: -webkit-fill-available;
+                    }
+
+                    .content {
+                        padding: 20px;
+                        width: 100%;
+                        height: 100%;
+                        border: none;
+                        border-radius: 0;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: center;
+                    }
+
                     .title {
                         font-size: 2rem;
+                        padding-top: calc(20px + env(safe-area-inset-top));
                     }
 
                     .intro-text {
@@ -168,10 +240,53 @@ export default function Home() {
 
                     .features {
                         grid-template-columns: 1fr;
+                        gap: 20px;
+                        margin-bottom: calc(60px + env(safe-area-inset-bottom));
+                    }
+
+                    .feature {
+                        padding: 15px;
+                    }
+
+                    .feature h3 {
+                        font-size: 1.2rem;
+                    }
+
+                    .feature-link {
+                        width: 100%;
+                        padding: 12px 20px;
+                    }
+
+                    .hamburger {
+                        display: block;
+                    }
+
+                    .hamburger.open span:nth-child(1) {
+                        transform: rotate(45deg) translate(5px, 5px);
+                    }
+
+                    .hamburger.open span:nth-child(2) {
+                        opacity: 0;
+                    }
+
+                    .hamburger.open span:nth-child(3) {
+                        transform: rotate(-45deg) translate(7px, -7px);
+                    }
+                }
+
+                /* iOS specific styles */
+                @supports (-webkit-touch-callout: none) {
+                    .landing-container {
+                        min-height: -webkit-fill-available;
                     }
 
                     .content {
-                        padding: 20px;
+                        overflow-y: auto;
+                        -webkit-overflow-scrolling: touch;
+                    }
+
+                    .feature-link {
+                        -webkit-tap-highlight-color: transparent;
                     }
                 }
             `}</style>
