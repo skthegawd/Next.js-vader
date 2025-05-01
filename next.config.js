@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     reactStrictMode: true,
+    swcMinify: true,
     
     // Basic configuration
     distDir: '.next',
@@ -35,9 +36,15 @@ const nextConfig = {
 
     // Disable specific features that might cause issues
     typescript: {
+        // !! WARN !!
+        // Dangerously allow production builds to successfully complete even if
+        // your project has type errors.
+        // !! WARN !!
         ignoreBuildErrors: true,
     },
     eslint: {
+        // Warning: This allows production builds to successfully complete even if
+        // your project has ESLint errors.
         ignoreDuringBuilds: true,
     },
     
@@ -57,6 +64,12 @@ const nextConfig = {
             };
         }
         return config;
+    },
+
+    env: {
+        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+        NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL,
+        NEXT_PUBLIC_API_VERSION: process.env.NEXT_PUBLIC_API_VERSION,
     },
 };
 

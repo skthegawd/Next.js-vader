@@ -33,7 +33,7 @@ interface ThemeData {
   };
 }
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
@@ -44,7 +44,7 @@ class ApiError extends Error {
   }
 }
 
-export class ApiClient {
+class ApiClient {
   private axios: AxiosInstance;
   private baseUrl: string;
 
@@ -153,7 +153,7 @@ export class ApiClient {
 
 // Create and export the API client instance
 export const api = new ApiClient({
-  baseUrl: process.env.NEXT_PUBLIC_API_URL!,
+  baseUrl: process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com',
   headers: {
     'X-Platform': 'web',
   },
