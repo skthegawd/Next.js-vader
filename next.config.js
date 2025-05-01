@@ -2,26 +2,24 @@
 const nextConfig = {
     reactStrictMode: true,
     
-    // Ensure proper static file serving
-    assetPrefix: process.env.NODE_ENV === 'production' ? '/_next' : '',
+    // Basic configuration
+    distDir: '.next',
     
     // Configure build output
-    output: 'export',  // Changed from 'standalone' to 'export' for static file generation
+    output: 'standalone',
     
     // Configure API routes
-    rewrites: async () => {
-        return {
-            beforeFiles: [
-                {
-                    source: '/api/:path*',
-                    destination: 'https://vader-yp5n.onrender.com/:path*',
-                },
-            ],
-        };
+    async rewrites() {
+        return [
+            {
+                source: '/api/:path*',
+                destination: 'https://vader-yp5n.onrender.com/:path*',
+            },
+        ];
     },
 
     // Configure headers for CORS
-    headers: async () => {
+    async headers() {
         return [
             {
                 source: '/:path*',
