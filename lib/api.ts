@@ -130,5 +130,7 @@ export class ApiClient {
   }
 }
 
-// Export the singleton instance
-export const api = ApiClient.getInstance(); 
+// Initialize and export the singleton instance
+const apiInstance = ApiClient.getInstance();
+export { apiInstance as api };
+export { ApiClient, ApiError }; 

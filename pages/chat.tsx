@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { NextPage } from 'next';
 import ChatInput from '../components/ChatInput';
-import { api, ApiClient } from '../lib/api';
+import { api, ApiClient, ApiError } from '../lib/api';
 import Head from 'next/head';
 import Layout from '../components/Layout';
 import MobileNav from '../components/MobileNav';

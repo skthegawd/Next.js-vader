@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import type { NextPage } from 'next';
 import Layout from '../components/Layout';
-import { api, ApiClient } from '../lib/api';
+import { api, ApiClient, ApiError } from '../lib/api';
 import MobileNav from '../components/MobileNav';
 
 interface TerminalEntry {
