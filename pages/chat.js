@@ -7,8 +7,56 @@ export default function Chat() {
     const [messages, setMessages] = useState([]);
     const [error, setError] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isListening, setIsListening] = useState(false);
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
+    const audioQueue = useRef([]);
+    const currentAudio = useRef(null);
+
+    // Initialize speech recognition
+    useEffect(() => {
+        if (typeof window !== 'undefined' && 'webkitSpeechRecognition' in window) {
+            const SpeechRecognition = window.webkitSpeechRecognition;
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                handleMessageSend({ text: transcript });
+            };
+
+            recognition.onerror = (event) => {
+                console.error('[ERROR] Speech recognition error:', event.error);
+                setIsListening(false);
+            };
+
+            recognition.onend = () => {
+                setIsListening(false);
+            };
+
+            window.recognition = recognition;
+        }
+    }, []);
+
+    const startListening = () => {
+        if (window.recognition && !isListening) {
+            try {
+                window.recognition.start();
+                setIsListening(true);
+            } catch (error) {
+                console.error('[ERROR] Failed to start speech recognition:', error);
+            }
+        }
+    };
+
+    const stopListening = () => {
+        if (window.recognition && isListening) {
+            window.recognition.stop();
+            setIsListening(false);
+        }
+    };
 
     const scrollToBottom = () => {
         if (messagesEndRef.current) {
@@ -20,10 +68,44 @@ export default function Chat() {
         scrollToBottom();
     }, [messages]);
 
+    // Audio queue management
+    const playNextInQueue = async () => {
+        if (audioQueue.current.length === 0) return;
+        
+        try {
+            const audioUrl = audioQueue.current[0];
+            console.log('[DEBUG] Playing next audio in queue:', audioUrl);
+            
+            const audio = new Audio(audioUrl);
+            currentAudio.current = audio;
+            
+            audio.onerror = (e) => {
+                console.error('[ERROR] Audio playback error:', e);
+                audioQueue.current.shift();
+                playNextInQueue();
+            };
+            
+            audio.onended = () => {
+                console.log('[DEBUG] Audio playback completed');
+                audioQueue.current.shift();
+                currentAudio.current = null;
+                playNextInQueue();
+            };
+            
+            await audio.play();
+        } catch (error) {
+            console.error('[ERROR] Failed to play audio:', error);
+            audioQueue.current.shift();
+            playNextInQueue();
+        }
+    };
+
     const handleMessageSend = async (messageData) => {
         try {
             setError(null);
             setIsLoading(true);
+            stopListening(); // Stop listening when sending a message
+            
             console.log('[DEBUG] Handling new message:', messageData);
             
             // Add user message immediately
@@ -38,7 +120,7 @@ export default function Chat() {
             
             // Get AI response
             const response = await sendToAI(messageData.text);
-            console.log('[DEBUG] Received AI response:', response);
+            console.log('[DEBUG] Received AI response:', JSON.stringify(response, null, 2));
             
             if (response && response.response) {
                 const newAIMessage = {
@@ -46,34 +128,22 @@ export default function Chat() {
                     type: 'ai',
                     text: response.response,
                     audioUrl: response.tts_audio,
-                    timestamp: new Date().toISOString()
+                    timestamp: response.timestamp || new Date().toISOString()
                 };
                 
+                console.log('[DEBUG] Adding AI message:', JSON.stringify(newAIMessage, null, 2));
                 setMessages(prev => [...prev, newAIMessage]);
                 
-                // Play audio if available
+                // Add audio to queue if available
                 if (response.tts_audio) {
-                    try {
-                        console.log('[DEBUG] Playing TTS audio from URL:', response.tts_audio);
-                        const audio = new Audio(response.tts_audio);
-                        audio.onerror = (e) => {
-                            console.error('[ERROR] Audio playback error:', e);
-                        };
-                        audio.onloadstart = () => {
-                            console.log('[DEBUG] Audio started loading');
-                        };
-                        audio.oncanplay = () => {
-                            console.log('[DEBUG] Audio ready to play');
-                        };
-                        await audio.play();
-                        console.log('[DEBUG] Audio playback started successfully');
-                    } catch (audioError) {
-                        console.error('[ERROR] Failed to play audio:', audioError);
-                        console.error('[ERROR] Audio URL was:', response.tts_audio);
+                    console.log('[DEBUG] Adding audio to queue:', response.tts_audio);
+                    audioQueue.current.push(response.tts_audio);
+                    if (!currentAudio.current) {
+                        playNextInQueue();
                     }
-                } else {
-                    console.log('[DEBUG] No TTS audio URL provided in response');
                 }
+            } else {
+                throw new Error('Invalid response format from API');
             }
         } catch (error) {
             console.error('[ERROR] Failed to process message:', error);
@@ -86,6 +156,20 @@ export default function Chat() {
         }
     };
 
+    // Cleanup audio on unmount
+    useEffect(() => {
+        return () => {
+            if (currentAudio.current) {
+                currentAudio.current.pause();
+                currentAudio.current = null;
+            }
+            audioQueue.current = [];
+            if (window.recognition) {
+                window.recognition.stop();
+            }
+        };
+    }, []);
+
     return (
         <>
             <Head>
@@ -96,6 +180,14 @@ export default function Chat() {
                 <div className="chat-container">
                     <div className="chat-header">
                         <h1>Chat with Lord Vader</h1>
+                        <button 
+                            className={`voice-button ${isListening ? 'listening' : ''}`}
+                            onClick={isListening ? stopListening : startListening}
+                            title={isListening ? "Stop speaking" : "Start speaking"}
+                        >
+                            <span className="microphone-icon"></span>
+                            {isListening ? "Listening..." : "Speak"}
+                        </button>
                     </div>
                     <div className="messages-container" ref={messagesContainerRef}>
                         {messages.length === 0 ? (
@@ -142,7 +234,7 @@ export default function Chat() {
                         <div ref={messagesEndRef} />
                     </div>
                     <div className="input-container">
-                        <ChatInput onMessageSend={handleMessageSend} disabled={isLoading} />
+                        <ChatInput onMessageSend={handleMessageSend} disabled={isLoading || isListening} />
                     </div>
                 </div>
             </div>
@@ -180,6 +272,9 @@ export default function Chat() {
                 }
 
                 .chat-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
                     text-align: center;
                     margin-bottom: 20px;
                     padding: 20px 0;
@@ -355,6 +450,50 @@ export default function Chat() {
 
                     .chat-header h1 {
                         font-size: 1.5rem;
+                    }
+                }
+
+                .voice-button {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 10px 20px;
+                    background: rgba(255, 0, 0, 0.8);
+                    border: none;
+                    border-radius: 20px;
+                    color: white;
+                    font-weight: bold;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                }
+
+                .voice-button:hover {
+                    background: rgba(255, 0, 0, 1);
+                    transform: translateY(-1px);
+                }
+
+                .voice-button.listening {
+                    background: #ff0000;
+                    animation: pulse 1.5s infinite;
+                }
+
+                .microphone-icon {
+                    width: 16px;
+                    height: 16px;
+                    background: white;
+                    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z'/%3E%3C/svg%3E") no-repeat center;
+                    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z'/%3E%3C/svg%3E") no-repeat center;
+                }
+
+                @keyframes pulse {
+                    0% {
+                        box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.4);
+                    }
+                    70% {
+                        box-shadow: 0 0 0 10px rgba(255, 0, 0, 0);
+                    }
+                    100% {
+                        box-shadow: 0 0 0 0 rgba(255, 0, 0, 0);
                     }
                 }
             `}</style>
