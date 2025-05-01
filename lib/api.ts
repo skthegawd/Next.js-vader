@@ -12,11 +12,12 @@ export class ApiError extends Error {
   }
 }
 
-export class ApiClient {
+class ApiClient {
+  private static instance: ApiClient;
   private axios: AxiosInstance;
   private baseUrl: string;
 
-  constructor(config: ApiConfig) {
+  private constructor(config: ApiConfig) {
     this.baseUrl = config.baseUrl;
     this.axios = axios.create({
       baseURL: config.baseUrl,
@@ -41,6 +42,18 @@ export class ApiClient {
         throw error;
       }
     );
+  }
+
+  public static getInstance(): ApiClient {
+    if (!ApiClient.instance) {
+      ApiClient.instance = new ApiClient({
+        baseUrl: process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com',
+        headers: {
+          'X-Platform': 'web',
+        },
+      });
+    }
+    return ApiClient.instance;
   }
 
   async initialize(): Promise<ApiResponse<SessionData>> {
@@ -117,13 +130,6 @@ export class ApiClient {
   }
 }
 
-// Create the API client instance
-const apiClient = new ApiClient({
-  baseUrl: process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com',
-  headers: {
-    'X-Platform': 'web',
-  },
-});
-
-// Export both the class and the instance
-export { apiClient as api }; 
+// Export the singleton instance
+const api = ApiClient.getInstance();
+export default api; 

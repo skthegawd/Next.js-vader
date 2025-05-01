@@ -1,15 +1,22 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
+import type { NextPage } from 'next';
 import Layout from '../components/Layout';
-import { sendToAI } from '../lib/api';
+import api from '../lib/api';
 import MobileNav from '../components/MobileNav';
 
-export default function Terminal() {
-    const [history, setHistory] = useState([]);
-    const [currentInput, setCurrentInput] = useState('');
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const terminalRef = useRef(null);
-    const inputRef = useRef(null);
+interface TerminalEntry {
+    type: 'system' | 'command' | 'response' | 'error';
+    content: string;
+    audioUrl?: string;
+}
+
+const Terminal: NextPage = () => {
+    const [history, setHistory] = useState<TerminalEntry[]>([]);
+    const [currentInput, setCurrentInput] = useState<string>('');
+    const [isProcessing, setIsProcessing] = useState<boolean>(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+    const terminalRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         // Add welcome message
@@ -58,13 +65,13 @@ export default function Terminal() {
     // Handle mobile touch events
     useEffect(() => {
         let touchStartY = 0;
-        const handleTouchStart = (e) => {
+        const handleTouchStart = (e: TouchEvent) => {
             touchStartY = e.touches[0].clientY;
         };
 
-        const handleTouchMove = (e) => {
+        const handleTouchMove = (e: TouchEvent) => {
             const touchY = e.touches[0].clientY;
-            const scrollTop = terminalRef.current.scrollTop;
+            const scrollTop = terminalRef.current?.scrollTop || 0;
             
             // Prevent pull-to-refresh when at top of terminal
             if (scrollTop === 0 && touchY > touchStartY) {
@@ -86,7 +93,7 @@ export default function Terminal() {
         };
     }, []);
 
-    const handleCommand = async (e) => {
+    const handleCommand = async (e: FormEvent) => {
         e.preventDefault();
         
         if (!currentInput.trim() || isProcessing) return;
@@ -127,19 +134,19 @@ export default function Terminal() {
                 }]);
             } else {
                 // Send command to AI
-                const response = await sendToAI(command);
+                const response = await api.sendToAI(command);
                 
-                if (response && response.response) {
+                if (response && response.data) {
                     setHistory(prev => [...prev, {
                         type: 'response',
-                        content: response.response,
-                        audioUrl: response.tts_audio
+                        content: response.data.response,
+                        audioUrl: response.data.tts_audio
                     }]);
 
                     // Play audio if available
-                    if (response.tts_audio) {
+                    if (response.data.tts_audio) {
                         try {
-                            const audio = new Audio(response.tts_audio);
+                            const audio = new Audio(response.data.tts_audio);
                             await audio.play();
                         } catch (error) {
                             console.error('[ERROR] Failed to play audio:', error);
@@ -250,14 +257,12 @@ export default function Terminal() {
                     position: sticky;
                     top: 0;
                     z-index: 10;
-                    backdrop-filter: blur(10px);
-                    -webkit-backdrop-filter: blur(10px);
                 }
 
                 .terminal-title {
                     color: #ff0000;
-                    font-weight: bold;
-                    text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+                    font-family: 'Courier New', monospace;
+                    font-size: 1.2rem;
                 }
 
                 .terminal-controls {
@@ -269,47 +274,36 @@ export default function Terminal() {
                     width: 12px;
                     height: 12px;
                     border-radius: 50%;
-                    opacity: 0.8;
                 }
 
-                .control.red { background: #ff5f56; }
-                .control.yellow { background: #ffbd2e; }
-                .control.green { background: #27c93f; }
+                .red { background: #ff5f56; }
+                .yellow { background: #ffbd2e; }
+                .green { background: #27c93f; }
 
                 .terminal-body {
                     flex: 1;
-                    padding: 15px;
+                    padding: 20px;
                     overflow-y: auto;
                     font-family: 'Courier New', monospace;
-                    font-size: 14px;
-                    line-height: 1.5;
-                    -webkit-overflow-scrolling: touch;
-                    overscroll-behavior-y: contain;
+                    color: #00ff00;
+                    line-height: 1.6;
                 }
 
                 .terminal-line {
                     margin-bottom: 10px;
                     white-space: pre-wrap;
-                    word-break: break-word;
+                    word-wrap: break-word;
                 }
 
-                .terminal-line.system { color: #00ff00; }
-                .terminal-line.command { color: #ffffff; }
-                .terminal-line.response { color: #ff0000; }
-                .terminal-line.error { color: #ff4444; }
+                .terminal-line.system { color: #ffff00; }
+                .terminal-line.command { color: #00ff00; }
+                .terminal-line.response { color: #ffffff; }
+                .terminal-line.error { color: #ff0000; }
 
                 .terminal-input-line {
                     display: flex;
                     align-items: center;
                     margin-top: 10px;
-                    position: sticky;
-                    bottom: 0;
-                    background: rgba(0, 0, 0, 0.95);
-                    padding: 15px;
-                    padding-bottom: calc(15px + env(safe-area-inset-bottom));
-                    border-top: 1px solid rgba(255, 0, 0, 0.3);
-                    backdrop-filter: blur(10px);
-                    -webkit-backdrop-filter: blur(10px);
                 }
 
                 .prompt {
@@ -321,12 +315,28 @@ export default function Terminal() {
                     flex: 1;
                     background: transparent;
                     border: none;
-                    color: #ffffff;
+                    color: #00ff00;
                     font-family: 'Courier New', monospace;
-                    font-size: 16px;
+                    font-size: 1rem;
                     outline: none;
-                    padding: 8px 0;
-                    min-height: 44px;
+                    padding: 0;
+                }
+
+                .terminal-input::placeholder {
+                    color: rgba(0, 255, 0, 0.5);
+                }
+
+                .terminal-input:disabled {
+                    opacity: 0.5;
+                }
+
+                .audio-player {
+                    margin-top: 10px;
+                }
+
+                .audio-player audio {
+                    width: 100%;
+                    max-width: 300px;
                 }
 
                 .hamburger {
@@ -350,17 +360,6 @@ export default function Terminal() {
                     transition: 0.3s;
                 }
 
-                .audio-player {
-                    margin-top: 10px;
-                }
-
-                .audio-player audio {
-                    width: 100%;
-                    height: 44px;
-                    border-radius: 22px;
-                    background: rgba(0, 0, 0, 0.3);
-                }
-
                 @media (max-width: 768px) {
                     .terminal-container {
                         padding: 0;
@@ -378,31 +377,10 @@ export default function Terminal() {
                     .hamburger {
                         display: block;
                     }
-
-                    .hamburger.open span:nth-child(1) {
-                        transform: rotate(45deg) translate(5px, 5px);
-                    }
-
-                    .hamburger.open span:nth-child(2) {
-                        opacity: 0;
-                    }
-
-                    .hamburger.open span:nth-child(3) {
-                        transform: rotate(-45deg) translate(7px, -7px);
-                    }
-
-                    /* iOS specific styles */
-                    @supports (-webkit-touch-callout: none) {
-                        .terminal-container {
-                            height: -webkit-fill-available;
-                        }
-
-                        .terminal-input-line {
-                            position: sticky;
-                        }
-                    }
                 }
             `}</style>
         </Layout>
     );
-} 
+};
+
+export default Terminal; 
