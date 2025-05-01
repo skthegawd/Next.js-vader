@@ -1,57 +1,178 @@
 /* Global Styles for Vader AI */
+:root {
+  --safe-area-inset-top: env(safe-area-inset-top);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  height: -webkit-fill-available;
+}
+
 body {
-    background-color: #000;
-    color: #ff4444;
-    font-family: 'Orbitron', sans-serif;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start; /* Allows scrolling if needed */
+  background-color: #000;
+  color: #ff4444;
+  font-family: 'Orbitron', sans-serif;
+  margin: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  overscroll-behavior-y: none;
+}
+
+/* Mobile Navigation */
+.mobile-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.95);
+  padding: 10px;
+  padding-bottom: calc(10px + var(--safe-area-inset-bottom));
+  display: none;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Hamburger Menu */
+.hamburger {
+  display: none;
+  position: fixed;
+  top: calc(20px + var(--safe-area-inset-top));
+  right: 20px;
+  z-index: 1001;
+  padding: 15px;
 }
 
 /* Sidebar Styling */
 .sidebar {
-    background: #111;
-    padding: 20px;
-    width: 250px;
-    height: 100vh;
-    color: white;
-    position: fixed;
-    left: 0;
-    top: 0;
-    box-shadow: 2px 0px 10px rgba(255, 0, 0, 0.5);
-    overflow-y: auto; /* Allows scrolling if needed */
+  background: #111;
+  padding: 20px;
+  width: 250px;
+  height: 100vh;
+  color: white;
+  position: fixed;
+  left: 0;
+  top: 0;
+  box-shadow: 2px 0px 10px rgba(255, 0, 0, 0.5);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  transition: transform 0.3s ease-in-out;
 }
 
 /* Terminal Look for Chat */
 .terminal {
-    background: black;
-    border: 1px solid red;
-    padding: 20px;
-    color: #ff5555; /* Improved contrast */
-    font-size: 16px;
-    font-family: 'Orbitron', sans-serif;
-    width: 80%;
-    max-width: 600px;
-    height: 400px;
-    box-shadow: 0px 0px 10px rgba(255, 0, 0, 0.3);
+  background: black;
+  border: 1px solid red;
+  padding: 20px;
+  color: #ff5555;
+  font-size: 16px;
+  font-family: 'Orbitron', sans-serif;
+  width: 80%;
+  max-width: 600px;
+  height: 400px;
+  box-shadow: 0px 0px 10px rgba(255, 0, 0, 0.3);
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Button Enhancements */
 button {
-    background: red;
-    color: white;
-    border: none;
-    padding: 10px 15px;
-    font-size: 16px;
-    cursor: pointer;
-    border-radius: 5px;
-    transition: all 0.3s;
+  background: red;
+  color: white;
+  border: none;
+  padding: 15px 20px; /* Larger touch target */
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: all 0.3s;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  min-height: 44px; /* iOS minimum touch target */
+  min-width: 44px;
 }
 
 button:hover {
-    background: darkred;
-    box-shadow: 0px 0px 15px rgba(255, 0, 0, 0.8);
+  background: darkred;
+  box-shadow: 0px 0px 15px rgba(255, 0, 0, 0.8);
+}
+
+/* Mobile Styles */
+@media (max-width: 768px) {
+  .sidebar {
+    transform: translateX(-100%);
+    z-index: 1000;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .hamburger {
+    display: block;
+  }
+
+  .mobile-nav {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+  }
+
+  .terminal {
+    width: 95%;
+    margin: 10px;
+    height: calc(100vh - 120px - var(--safe-area-inset-bottom));
+  }
+
+  /* Improved touch targets for mobile */
+  a, button, input[type="button"], input[type="submit"] {
+    padding: 12px 20px;
+    margin: 8px 0;
+  }
+
+  /* Prevent text selection during touch interactions */
+  .no-select {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* iOS specific keyboard adjustments */
+  .input-wrapper {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 10px;
+    padding-bottom: calc(10px + var(--safe-area-inset-bottom));
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+}
+
+/* Handle iOS keyboard appearance */
+@media (max-width: 768px) and (orientation: landscape) {
+  .input-wrapper {
+    position: sticky;
+  }
+}
+
+/* Prevent pull-to-refresh on iOS */
+@supports (-webkit-touch-callout: none) {
+  body {
+    overscroll-behavior-y: none;
+  }
 }

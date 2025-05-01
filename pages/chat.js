@@ -2,16 +2,20 @@ import { useState, useEffect, useRef } from 'react';
 import ChatInput from '../components/ChatInput';
 import { sendToAI } from '../lib/api';
 import Head from 'next/head';
+import Layout from '../components/Layout';
+import MobileNav from '../components/MobileNav';
 
 export default function Chat() {
     const [messages, setMessages] = useState([]);
     const [error, setError] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isListening, setIsListening] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const messagesEndRef = useRef(null);
     const messagesContainerRef = useRef(null);
     const audioQueue = useRef([]);
     const currentAudio = useRef(null);
+    const inputRef = useRef(null);
 
     // Initialize speech recognition
     useEffect(() => {
@@ -38,6 +42,61 @@ export default function Chat() {
 
             window.recognition = recognition;
         }
+    }, []);
+
+    // Handle keyboard visibility on iOS
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const handleVisualViewportResize = () => {
+                if (window.visualViewport) {
+                    const currentHeight = window.visualViewport.height;
+                    const windowHeight = window.innerHeight;
+                    const isKeyboardVisible = windowHeight - currentHeight > 150;
+
+                    if (isKeyboardVisible && inputRef.current) {
+                        setTimeout(() => {
+                            inputRef.current.scrollIntoView({ behavior: 'smooth' });
+                        }, 100);
+                    }
+                }
+            };
+
+            window.visualViewport?.addEventListener('resize', handleVisualViewportResize);
+            return () => {
+                window.visualViewport?.removeEventListener('resize', handleVisualViewportResize);
+            };
+        }
+    }, []);
+
+    // Handle mobile touch events
+    useEffect(() => {
+        let touchStartY = 0;
+        const handleTouchStart = (e) => {
+            touchStartY = e.touches[0].clientY;
+        };
+
+        const handleTouchMove = (e) => {
+            const touchY = e.touches[0].clientY;
+            const scrollTop = messagesContainerRef.current.scrollTop;
+            
+            // Prevent pull-to-refresh when at top of messages
+            if (scrollTop === 0 && touchY > touchStartY) {
+                e.preventDefault();
+            }
+        };
+
+        const container = messagesContainerRef.current;
+        if (container) {
+            container.addEventListener('touchstart', handleTouchStart);
+            container.addEventListener('touchmove', handleTouchMove, { passive: false });
+        }
+
+        return () => {
+            if (container) {
+                container.removeEventListener('touchstart', handleTouchStart);
+                container.removeEventListener('touchmove', handleTouchMove);
+            }
+        };
     }, []);
 
     const startListening = () => {
@@ -171,332 +230,213 @@ export default function Chat() {
     }, []);
 
     return (
-        <>
-            <Head>
-                <title>Chat with Lord Vader</title>
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-            </Head>
-            <div className="page-container">
-                <div className="chat-container">
-                    <div className="chat-header">
-                        <h1>Chat with Lord Vader</h1>
-                        <button 
-                            className={`voice-button ${isListening ? 'listening' : ''}`}
-                            onClick={isListening ? stopListening : startListening}
-                            title={isListening ? "Stop speaking" : "Start speaking"}
-                        >
-                            <span className="microphone-icon"></span>
-                            {isListening ? "Listening..." : "Speak"}
-                        </button>
-                    </div>
-                    <div className="messages-container" ref={messagesContainerRef}>
-                        {messages.length === 0 ? (
-                            <div className="empty-state">
-                                Begin your conversation with Lord Vader...
-                            </div>
-                        ) : (
-                            messages.map((msg) => (
-                                <div key={msg.id} className={`message ${msg.type}`}>
-                                    <div className="message-content">
-                                        <div className="message-text">{msg.text}</div>
-                                        {msg.type === 'ai' && msg.audioUrl && (
-                                            <div className="audio-controls">
-                                                <audio 
-                                                    controls 
-                                                    src={msg.audioUrl}
-                                                    preload="metadata"
-                                                    onError={(e) => {
-                                                        console.error('[ERROR] Audio element error:', e);
-                                                        e.target.parentElement.innerHTML = 'Audio playback failed. Click message to try again.';
-                                                    }}
-                                                >
-                                                    Your browser does not support the audio element.
-                                                </audio>
-                                            </div>
-                                        )}
-                                        <div className="message-timestamp">
-                                            {new Date(msg.timestamp).toLocaleTimeString()}
+        <Layout title="Chat with Lord Vader">
+            <div className="chat-container">
+                <button 
+                    className="hamburger" 
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    aria-label="Toggle menu"
+                >
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+
+                <div className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
+                    {/* Sidebar content */}
+                </div>
+
+                <div className="chat-header">
+                    <h1>Chat with Lord Vader</h1>
+                    <button 
+                        className={`voice-button ${isListening ? 'listening' : ''}`}
+                        onClick={isListening ? stopListening : startListening}
+                        title={isListening ? "Stop speaking" : "Start speaking"}
+                    >
+                        <span className="microphone-icon"></span>
+                        {isListening ? "Listening..." : "Speak"}
+                    </button>
+                </div>
+
+                <div className="messages-container" ref={messagesContainerRef}>
+                    {messages.length === 0 ? (
+                        <div className="empty-state">
+                            Begin your conversation with Lord Vader...
+                        </div>
+                    ) : (
+                        messages.map((msg) => (
+                            <div key={msg.id} className={`message ${msg.type}`}>
+                                <div className="message-content">
+                                    <div className="message-text">{msg.text}</div>
+                                    {msg.type === 'ai' && msg.audioUrl && (
+                                        <div className="audio-controls">
+                                            <audio 
+                                                controls 
+                                                src={msg.audioUrl}
+                                                preload="metadata"
+                                                onError={(e) => {
+                                                    console.error('[ERROR] Audio element error:', e);
+                                                    e.target.parentElement.innerHTML = 'Audio playback failed. Click message to try again.';
+                                                }}
+                                            >
+                                                Your browser does not support the audio element.
+                                            </audio>
                                         </div>
+                                    )}
+                                    <div className="message-timestamp">
+                                        {new Date(msg.timestamp).toLocaleTimeString()}
                                     </div>
                                 </div>
-                            ))
-                        )}
-                        {isLoading && (
-                            <div className="loading-indicator">
-                                <div className="loading-dots">
-                                    <span></span>
-                                    <span></span>
-                                    <span></span>
-                                </div>
                             </div>
-                        )}
-                        {error && <div className="error-message">{error}</div>}
-                        <div ref={messagesEndRef} />
-                    </div>
-                    <div className="input-container">
-                        <ChatInput onMessageSend={handleMessageSend} disabled={isLoading || isListening} />
-                    </div>
+                        ))
+                    )}
+                    {isLoading && (
+                        <div className="loading-indicator">
+                            <div className="loading-dots">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    )}
+                    {error && <div className="error-message">{error}</div>}
+                    <div ref={messagesEndRef} />
                 </div>
+
+                <div className="input-wrapper" ref={inputRef}>
+                    <ChatInput onMessageSend={handleMessageSend} disabled={isLoading || isListening} />
+                </div>
+
+                <MobileNav />
             </div>
-            <style jsx global>{`
-                body {
-                    margin: 0;
-                    padding: 0;
-                    background: #000000;
-                    color: #ffffff;
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-                }
 
-                * {
-                    box-sizing: border-box;
-                }
-            `}</style>
             <style jsx>{`
-                .page-container {
-                    min-height: 100vh;
-                    display: flex;
-                    flex-direction: column;
-                    background: #000000;
-                }
-
                 .chat-container {
-                    flex: 1;
-                    max-width: 800px;
-                    margin: 0 auto;
-                    padding: 20px;
-                    width: 100%;
-                    box-sizing: border-box;
+                    height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
                     display: flex;
                     flex-direction: column;
-                    height: 100vh;
+                    background: rgba(0, 0, 0, 0.9);
+                    border: 1px solid #ff0000;
+                    border-radius: 10px;
+                    box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
+                    overflow: hidden;
+                    position: relative;
                 }
 
                 .chat-header {
                     display: flex;
-                    align-items: center;
                     justify-content: space-between;
-                    text-align: center;
-                    margin-bottom: 20px;
-                    padding: 20px 0;
-                    border-bottom: 1px solid #333;
-                }
-
-                .chat-header h1 {
-                    margin: 0;
-                    color: #ff0000;
-                    text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
-                    font-size: 2rem;
+                    align-items: center;
+                    padding: 15px;
+                    padding-top: calc(15px + env(safe-area-inset-top));
+                    background: rgba(0, 0, 0, 0.95);
+                    border-bottom: 1px solid #ff0000;
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
+                    backdrop-filter: blur(10px);
+                    -webkit-backdrop-filter: blur(10px);
                 }
 
                 .messages-container {
                     flex: 1;
                     overflow-y: auto;
-                    padding: 20px;
-                    background: rgba(255, 0, 0, 0.05);
-                    border-radius: 8px;
-                    margin-bottom: 20px;
-                    scroll-behavior: smooth;
-                }
-
-                .empty-state {
-                    text-align: center;
-                    padding: 20px;
-                    color: #666;
-                    font-style: italic;
-                }
-
-                .message {
-                    margin-bottom: 20px;
-                    opacity: 0;
-                    transform: translateY(20px);
-                    animation: fadeInUp 0.3s ease forwards;
-                }
-
-                @keyframes fadeInUp {
-                    from {
-                        opacity: 0;
-                        transform: translateY(20px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-
-                .message.user .message-content {
-                    background: rgba(255, 255, 255, 0.1);
-                    margin-left: auto;
-                    margin-right: 0;
-                    border-radius: 15px 15px 0 15px;
-                }
-
-                .message.ai .message-content {
-                    background: rgba(255, 0, 0, 0.1);
-                    margin-right: auto;
-                    margin-left: 0;
-                    border-radius: 15px 15px 15px 0;
-                }
-
-                .message-content {
-                    max-width: 80%;
                     padding: 15px;
+                    -webkit-overflow-scrolling: touch;
+                    scroll-behavior: smooth;
+                    overscroll-behavior-y: contain;
                 }
 
-                .message-text {
-                    margin: 0;
-                    line-height: 1.5;
-                    white-space: pre-wrap;
-                    word-break: break-word;
+                .input-wrapper {
+                    position: sticky;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    padding: 15px;
+                    padding-bottom: calc(15px + env(safe-area-inset-bottom));
+                    background: rgba(0, 0, 0, 0.95);
+                    border-top: 1px solid #ff0000;
+                    backdrop-filter: blur(10px);
+                    -webkit-backdrop-filter: blur(10px);
                 }
 
-                .error-message {
-                    color: #ff4444;
-                    padding: 10px;
-                    margin: 10px 0;
-                    border-radius: 4px;
-                    background: rgba(255, 68, 68, 0.1);
-                    animation: fadeIn 0.3s ease;
+                .hamburger {
+                    display: none;
+                    position: fixed;
+                    top: calc(20px + env(safe-area-inset-top));
+                    right: 20px;
+                    z-index: 1001;
+                    background: transparent;
+                    border: none;
+                    padding: 15px;
+                    cursor: pointer;
                 }
 
-                .message-timestamp {
-                    font-size: 12px;
-                    color: rgba(255, 255, 255, 0.5);
-                    margin-top: 5px;
-                    text-align: right;
-                }
-
-                .audio-controls {
-                    margin-top: 15px;
-                    position: relative;
-                }
-
-                .audio-controls audio {
-                    width: 100%;
-                    height: 40px;
-                    border-radius: 20px;
-                    background: rgba(0, 0, 0, 0.3);
-                    outline: none;
-                }
-
-                .audio-controls audio::-webkit-media-controls-panel {
-                    background: rgba(0, 0, 0, 0.5);
-                }
-
-                .audio-controls audio::-webkit-media-controls-current-time-display,
-                .audio-controls audio::-webkit-media-controls-time-remaining-display {
-                    color: #ffffff;
-                }
-
-                .audio-controls audio::-webkit-media-controls-play-button,
-                .audio-controls audio::-webkit-media-controls-mute-button {
-                    filter: invert(1);
-                }
-
-                .audio-controls audio::-webkit-media-controls-timeline {
-                    background-color: rgba(255, 0, 0, 0.3);
-                }
-
-                .input-container {
-                    padding: 20px;
-                    background: rgba(255, 0, 0, 0.05);
-                    border-radius: 8px;
-                    position: relative;
-                }
-
-                .loading-indicator {
-                    display: flex;
-                    justify-content: center;
-                    padding: 20px;
-                }
-
-                .loading-dots {
-                    display: flex;
-                    gap: 8px;
-                }
-
-                .loading-dots span {
-                    width: 8px;
-                    height: 8px;
+                .hamburger span {
+                    display: block;
+                    width: 25px;
+                    height: 2px;
                     background: #ff0000;
-                    border-radius: 50%;
-                    animation: bounce 1s infinite;
+                    margin: 5px 0;
+                    transition: 0.3s;
                 }
 
-                .loading-dots span:nth-child(2) {
-                    animation-delay: 0.2s;
-                }
-
-                .loading-dots span:nth-child(3) {
-                    animation-delay: 0.4s;
-                }
-
-                @keyframes bounce {
-                    0%, 100% {
-                        transform: translateY(0);
-                    }
-                    50% {
-                        transform: translateY(-10px);
-                    }
-                }
-
-                @media (max-width: 600px) {
+                @media (max-width: 768px) {
                     .chat-container {
-                        padding: 10px;
+                        border-radius: 0;
+                        border: none;
                     }
 
-                    .message-content {
-                        max-width: 90%;
+                    .hamburger {
+                        display: block;
+                    }
+
+                    .hamburger.open span:nth-child(1) {
+                        transform: rotate(45deg) translate(5px, 5px);
+                    }
+
+                    .hamburger.open span:nth-child(2) {
+                        opacity: 0;
+                    }
+
+                    .hamburger.open span:nth-child(3) {
+                        transform: rotate(-45deg) translate(7px, -7px);
                     }
 
                     .chat-header h1 {
                         font-size: 1.5rem;
+                        margin-right: 50px;
                     }
-                }
 
-                .voice-button {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 10px 20px;
-                    background: rgba(255, 0, 0, 0.8);
-                    border: none;
-                    border-radius: 20px;
-                    color: white;
-                    font-weight: bold;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                }
-
-                .voice-button:hover {
-                    background: rgba(255, 0, 0, 1);
-                    transform: translateY(-1px);
-                }
-
-                .voice-button.listening {
-                    background: #ff0000;
-                    animation: pulse 1.5s infinite;
-                }
-
-                .microphone-icon {
-                    width: 16px;
-                    height: 16px;
-                    background: white;
-                    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z'/%3E%3C/svg%3E") no-repeat center;
-                    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z'/%3E%3C/svg%3E") no-repeat center;
-                }
-
-                @keyframes pulse {
-                    0% {
-                        box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.4);
+                    .message {
+                        max-width: 85%;
                     }
-                    70% {
-                        box-shadow: 0 0 0 10px rgba(255, 0, 0, 0);
+
+                    .message.user {
+                        margin-left: auto;
                     }
-                    100% {
-                        box-shadow: 0 0 0 0 rgba(255, 0, 0, 0);
+
+                    .message.ai {
+                        margin-right: auto;
+                    }
+
+                    .audio-controls audio {
+                        width: 100%;
+                        margin-top: 10px;
+                    }
+
+                    /* iOS specific styles */
+                    @supports (-webkit-touch-callout: none) {
+                        .chat-container {
+                            height: -webkit-fill-available;
+                        }
+
+                        .input-wrapper {
+                            position: sticky;
+                        }
                     }
                 }
             `}</style>
-        </>
+        </Layout>
     );
 }
