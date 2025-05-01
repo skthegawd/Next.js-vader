@@ -117,13 +117,21 @@ export class ApiClient {
   }
 }
 
-// Create and export the API instance
-export const api = new ApiClient({
-  baseUrl: process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com',
-  headers: {
-    'X-Platform': 'web',
-  },
-});
+// Module-level instance
+let apiInstance: ApiClient | undefined;
 
-// Also export as default for compatibility
-export default api; 
+// Function to get or create the API instance
+export function getApi(): ApiClient {
+  if (!apiInstance) {
+    apiInstance = new ApiClient({
+      baseUrl: process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com',
+      headers: {
+        'X-Platform': 'web',
+      },
+    });
+  }
+  return apiInstance;
+}
+
+// Export the instance getter as the default export
+export default getApi; 

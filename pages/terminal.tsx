@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import type { NextPage } from 'next';
 import Layout from '../components/Layout';
-import { api } from '../lib/api';
+import { getApi } from '../lib/api';
 import MobileNav from '../components/MobileNav';
 
 interface TerminalEntry {
@@ -11,6 +11,7 @@ interface TerminalEntry {
 }
 
 const Terminal: NextPage = () => {
+    const api = getApi();
     const [history, setHistory] = useState<TerminalEntry[]>([]);
     const [currentInput, setCurrentInput] = useState<string>('');
     const [isProcessing, setIsProcessing] = useState<boolean>(false);

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { NextPage } from 'next';
 import ChatInput from '../components/ChatInput';
-import { api } from '../lib/api';
+import { getApi } from '../lib/api';
 import Head from 'next/head';
 import Layout from '../components/Layout';
 import MobileNav from '../components/MobileNav';
@@ -62,6 +62,7 @@ declare global {
 }
 
 const Chat: NextPage = () => {
+    const api = getApi();
     const [messages, setMessages] = useState<Message[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);

@@ -3,11 +3,13 @@ import type { AppProps } from 'next/app';
 import "../styles/globals.css";  // Global styles
 import Layout from "../components/Layout";
 import { AuthProvider } from "../context/AuthContext";
-import { api } from '../lib/api';
+import { getApi } from '../lib/api';
 import ws from '../lib/websocket';
 import themeManager from '../lib/theme';
 
 function MyApp({ Component, pageProps }: AppProps) {
+    const api = getApi();
+
     useEffect(() => {
         const initializeApp = async () => {
             try {

@@ -1,4 +1,4 @@
-import { api } from './api';
+import { getApi } from './api';
 import type { ThemeData } from './types';
 
 interface ThemeColors {
@@ -27,10 +27,11 @@ interface ThemeConfig {
 
 export class ThemeManager {
   private currentTheme: ThemeConfig | null = null;
+  private api = getApi();
 
   async initialize(): Promise<void> {
     try {
-      const { data } = await api.getTheme();
+      const { data } = await this.api.getTheme();
       this.currentTheme = this.processThemeData(data);
       this.applyTheme(this.currentTheme);
     } catch (error) {
