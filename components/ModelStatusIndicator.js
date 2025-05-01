@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { initializeWebSocket, getModelStatus } from '../lib/api';
+import { logger } from '../lib/logger';
 
-const ModelStatusIndicator = ({ onModelParamsChange }) => {
+const ModelStatusIndicator = ({ onModelParamsChange, wsStatus }) => {
     const [modelStatus, setModelStatus] = useState({
         gptModel: 'Loading...',
         voiceModel: 'Loading...',
@@ -33,6 +34,10 @@ const ModelStatusIndicator = ({ onModelParamsChange }) => {
                 setError(null);
                 const status = await getModelStatus();
                 setModelStatus(status);
+                onModelParamsChange({
+                    temperature: status.temperature,
+                    maxTokens: status.maxTokens
+                });
             } catch (err) {
                 console.error('Failed to fetch model status:', err);
                 setError('Failed to fetch model status');
@@ -46,7 +51,7 @@ const ModelStatusIndicator = ({ onModelParamsChange }) => {
             cleanup();
             clearInterval(statusInterval);
         };
-    }, []);
+    }, [onModelParamsChange]);
 
     const handleParameterChange = (param, value) => {
         setModelStatus(prev => {
@@ -56,86 +61,99 @@ const ModelStatusIndicator = ({ onModelParamsChange }) => {
         });
     };
 
+    const getStatusColor = (status) => {
+        switch (status) {
+            case 'connected':
+                return 'bg-green-500';
+            case 'disconnected':
+                return 'bg-red-500';
+            case 'error':
+                return 'bg-yellow-500';
+            default:
+                return 'bg-gray-500';
+        }
+    };
+
+    const getStatusText = (status) => {
+        switch (status) {
+            case 'connected':
+                return 'WebSocket Connected';
+            case 'disconnected':
+                return 'WebSocket Disconnected';
+            case 'error':
+                return 'WebSocket Error';
+            case 'failed':
+                return 'WebSocket Failed';
+            default:
+                return 'WebSocket Initializing';
+        }
+    };
+
     return (
-        <div className="bg-gray-800 p-4 rounded-lg shadow-lg space-y-4">
-            {/* Connection Status */}
-            <div className="flex items-center space-x-2">
-                <div className={`w-3 h-3 rounded-full ${
-                    wsStatus === 'connected' ? 'bg-green-500' :
-                    wsStatus === 'error' ? 'bg-red-500' :
-                    'bg-yellow-500'
-                }`} />
-                <span className="text-sm text-gray-300">
-                    {wsStatus === 'connected' ? 'Connected' :
-                     wsStatus === 'error' ? 'Connection Error' :
-                     'Connecting...'}
-                </span>
-            </div>
-
-            {/* Processing Indicator */}
-            {isProcessing && (
+        <div className="bg-black bg-opacity-50 p-4 rounded-lg shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-red-500">Model Status</h2>
                 <div className="flex items-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                    <span className="text-sm text-gray-300">Processing request...</span>
-                </div>
-            )}
-
-            {/* Model Information */}
-            <div className="flex flex-col space-y-2">
-                <div className="flex items-center justify-between">
-                    <span className="text-gray-300">GPT Model:</span>
-                    <span className="text-green-400 font-medium">{modelStatus.gptModel}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                    <span className="text-gray-300">Voice Model:</span>
-                    <span className="text-green-400 font-medium">{modelStatus.voiceModel}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                    <span className="text-gray-300">Streaming:</span>
-                    <span className={modelStatus.isStreaming ? 'text-green-400' : 'text-yellow-400'}>
-                        {modelStatus.isStreaming ? 'Enabled' : 'Disabled'}
-                    </span>
+                    <div className={`w-3 h-3 rounded-full ${getStatusColor(wsStatus)}`}></div>
+                    <span className="text-sm text-gray-300">{getStatusText(wsStatus)}</span>
                 </div>
             </div>
-
-            {/* Model Parameters */}
-            <div className="space-y-3">
+            
+            <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="block text-sm text-gray-400 mb-1">
-                        Temperature: {modelStatus.temperature}
-                    </label>
+                    <label className="block text-sm font-medium text-gray-400">GPT Model</label>
+                    <div className="mt-1 text-white">{modelStatus.gptModel}</div>
+                </div>
+                
+                <div>
+                    <label className="block text-sm font-medium text-gray-400">Voice Model</label>
+                    <div className="mt-1 text-white">{modelStatus.voiceModel}</div>
+                </div>
+                
+                <div>
+                    <label className="block text-sm font-medium text-gray-400">Temperature</label>
                     <input
                         type="range"
                         min="0"
                         max="1"
                         step="0.1"
                         value={modelStatus.temperature}
-                        onChange={(e) => handleParameterChange('temperature', parseFloat(e.target.value))}
-                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        onChange={(e) => {
+                            const newTemp = parseFloat(e.target.value);
+                            setModelStatus(prev => ({ ...prev, temperature: newTemp }));
+                            onModelParamsChange({
+                                temperature: newTemp,
+                                maxTokens: modelStatus.maxTokens
+                            });
+                        }}
+                        className="w-full mt-1"
                     />
+                    <div className="text-sm text-gray-300 mt-1">{modelStatus.temperature}</div>
                 </div>
+                
                 <div>
-                    <label className="block text-sm text-gray-400 mb-1">
-                        Max Tokens: {modelStatus.maxTokens}
-                    </label>
+                    <label className="block text-sm font-medium text-gray-400">Max Tokens</label>
                     <input
-                        type="range"
-                        min="256"
+                        type="number"
+                        min="1"
                         max="4096"
-                        step="256"
                         value={modelStatus.maxTokens}
-                        onChange={(e) => handleParameterChange('maxTokens', parseInt(e.target.value))}
-                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        onChange={(e) => {
+                            const newTokens = parseInt(e.target.value);
+                            setModelStatus(prev => ({ ...prev, maxTokens: newTokens }));
+                            onModelParamsChange({
+                                temperature: modelStatus.temperature,
+                                maxTokens: newTokens
+                            });
+                        }}
+                        className="w-full mt-1 bg-gray-700 text-white px-2 py-1 rounded"
                     />
                 </div>
             </div>
-
-            {/* Error Display */}
-            {error && (
-                <div className="bg-red-900/50 p-2 rounded text-sm text-red-200">
-                    {error}
-                </div>
-            )}
+            
+            <div className="mt-4 text-xs text-gray-400">
+                Last updated: {new Date().toLocaleTimeString()}
+            </div>
         </div>
     );
 };

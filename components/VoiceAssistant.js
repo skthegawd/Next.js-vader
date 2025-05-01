@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { sendToAI } from '../lib/api';
 import { tts_api_tts, stt_api_stt, wakeword_api_wakeword } from '../lib/voice';
+import wsService, { WS_MESSAGE_TYPES } from '../lib/websocket';
+import { logger } from '../lib/logger';
 import ModelStatusIndicator from './ModelStatusIndicator';
 
 export default function VoiceAssistant() {
@@ -16,9 +18,61 @@ export default function VoiceAssistant() {
         maxTokens: 2048
     });
     const [voiceEnabled, setVoiceEnabled] = useState(true);
+    const [wsStatus, setWsStatus] = useState('disconnected');
 
     const messagesEndRef = useRef(null);
     const currentMessageRef = useRef('');
+
+    // Initialize WebSocket connection
+    useEffect(() => {
+        // Subscribe to WebSocket status changes
+        const unsubscribeStatus = wsService.onStatusChange((status) => {
+            setWsStatus(status);
+            if (status === 'connected') {
+                logger.info('WebSocket connected, requesting initial model status');
+                wsService.send(WS_MESSAGE_TYPES.MODEL_STATUS, { action: 'get' });
+            }
+        });
+
+        // Subscribe to different message types
+        const unsubscribeModelStatus = wsService.subscribe(
+            WS_MESSAGE_TYPES.MODEL_STATUS,
+            (data) => {
+                logger.debug('Received model status update', data);
+                setModelParams(data);
+            }
+        );
+
+        const unsubscribeWakeword = wsService.subscribe(
+            WS_MESSAGE_TYPES.WAKEWORD_DETECTED,
+            (data) => {
+                logger.debug('Wakeword detection event', data);
+                if (data.detected) {
+                    handleWakewordDetected();
+                }
+            }
+        );
+
+        const unsubscribeVoice = wsService.subscribe(
+            WS_MESSAGE_TYPES.VOICE_STATUS,
+            (data) => {
+                logger.debug('Voice status update', data);
+                setVoiceEnabled(data.enabled);
+            }
+        );
+
+        // Connect to WebSocket
+        wsService.connect();
+
+        // Cleanup subscriptions
+        return () => {
+            unsubscribeStatus();
+            unsubscribeModelStatus();
+            unsubscribeWakeword();
+            unsubscribeVoice();
+            wsService.disconnect();
+        };
+    }, []);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -28,26 +82,16 @@ export default function VoiceAssistant() {
         scrollToBottom();
     }, [messages]);
 
-    useEffect(() => {
-        const listenForWakeword = async () => {
-            try {
-                console.log("[DEBUG] Listening for wakeword...");
-                const detected = await wakeword_api_wakeword();
-                if (detected) {
-                    console.log("[DEBUG] Wakeword detected!");
-                    setWakewordDetected(true);
-                    handleSend("How may I serve you, my master?");
-                    setTimeout(() => setWakewordDetected(false), 2000);
-                }
-            } catch (error) {
-                console.error("[ERROR] Wakeword detection failed:", error);
-            }
-        };
-        listenForWakeword();
-    }, []);
+    const handleWakewordDetected = () => {
+        setWakewordDetected(true);
+        handleSend("How may I serve you, my master?");
+        setTimeout(() => setWakewordDetected(false), 2000);
+    };
 
     const handleModelParamsChange = (params) => {
         setModelParams(params);
+        // Notify backend of parameter changes
+        wsService.send(WS_MESSAGE_TYPES.MODEL_STATUS, { action: 'update', params });
     };
 
     const handleSend = async (text) => {
@@ -59,7 +103,7 @@ export default function VoiceAssistant() {
         currentMessageRef.current = '';
 
         try {
-            console.log("[DEBUG] Sending request to GPT API...");
+            logger.debug("Sending request to GPT API...");
             
             if (isStreaming) {
                 setMessages(prev => [...prev, '']);
@@ -76,7 +120,7 @@ export default function VoiceAssistant() {
                 });
             } else {
                 const response = await sendToAI(text, { ...modelParams });
-                console.log("[DEBUG] GPT API Response:", response);
+                logger.debug("GPT API Response:", response);
 
                 if (response.error) {
                     throw new Error(response.error);
@@ -88,7 +132,7 @@ export default function VoiceAssistant() {
                 }
             }
         } catch (error) {
-            console.error("[ERROR] AI Processing Failed:", error);
+            logger.error("AI Processing Failed:", error);
             setMessages(prev => [...prev, "[Error] Unable to process command. Try again."]);
         } finally {
             setLoading(false);
@@ -96,10 +140,28 @@ export default function VoiceAssistant() {
         }
     };
 
+    const toggleVoice = () => {
+        const newState = !voiceEnabled;
+        setVoiceEnabled(newState);
+        wsService.send(WS_MESSAGE_TYPES.VOICE_STATUS, { enabled: newState });
+    };
+
+    const toggleStreaming = () => {
+        const newState = !isStreaming;
+        setIsStreaming(newState);
+        wsService.send(WS_MESSAGE_TYPES.SYSTEM, { 
+            action: 'update_streaming',
+            enabled: newState 
+        });
+    };
+
     return (
         <div className="flex flex-col h-full">
             <div className="mb-4">
-                <ModelStatusIndicator onModelParamsChange={handleModelParamsChange} />
+                <ModelStatusIndicator 
+                    onModelParamsChange={handleModelParamsChange}
+                    wsStatus={wsStatus}
+                />
             </div>
             <div className="terminal flex-grow">
                 <div className={`wakeword-indicator ${wakewordDetected ? "active" : ""}`}></div>
@@ -121,7 +183,7 @@ export default function VoiceAssistant() {
                             disabled={loading}
                         />
                         <button 
-                            onClick={() => setIsStreaming(!isStreaming)}
+                            onClick={toggleStreaming}
                             className={`px-3 py-1 rounded ${isStreaming ? 'bg-green-600' : 'bg-gray-600'}`}
                             title={isStreaming ? 'Streaming enabled' : 'Streaming disabled'}
                         >
@@ -129,7 +191,7 @@ export default function VoiceAssistant() {
                             ⚡
                         </button>
                         <button 
-                            onClick={() => setVoiceEnabled(!voiceEnabled)}
+                            onClick={toggleVoice}
                             className={`px-3 py-1 rounded ${voiceEnabled ? 'bg-green-600' : 'bg-gray-600'}`}
                             title={voiceEnabled ? 'Voice enabled' : 'Voice disabled'}
                         >
