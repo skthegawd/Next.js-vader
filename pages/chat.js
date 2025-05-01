@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ChatInput from '../components/ChatInput';
 import { sendToAI } from '../lib/api';
 import Head from 'next/head';
@@ -6,47 +6,69 @@ import Head from 'next/head';
 export default function Chat() {
     const [messages, setMessages] = useState([]);
     const [error, setError] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const messagesEndRef = useRef(null);
+    const messagesContainerRef = useRef(null);
 
-    // Debug: Log messages whenever they change
+    const scrollToBottom = () => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+    };
+
     useEffect(() => {
-        console.log('[DEBUG] Current messages:', messages);
+        scrollToBottom();
     }, [messages]);
 
     const handleMessageSend = async (messageData) => {
-        console.log('[DEBUG] HandleMessageSend called with:', messageData);
-        
         try {
-            const response = await sendToAI(messageData.text);
-            console.log('[DEBUG] Received response:', response);
+            setError(null);
+            setIsLoading(true);
+            console.log('[DEBUG] Handling new message:', messageData);
             
-            const newMessage = {
+            // Add user message immediately
+            const newUserMessage = {
+                id: Date.now(),
+                type: 'user',
                 text: messageData.text,
-                response: response.response,
-                audioUrl: response.tts_audio,
                 timestamp: new Date().toISOString()
             };
             
-            console.log('[DEBUG] Adding new message to state:', newMessage);
+            setMessages(prev => [...prev, newUserMessage]);
             
-            // Force a re-render by creating a new array
-            setMessages(currentMessages => {
-                const newMessages = [...currentMessages, newMessage];
-                console.log('[DEBUG] New messages array:', newMessages);
-                return newMessages;
-            });
-
-            // Handle audio after updating messages
-            if (response.tts_audio) {
-                try {
-                    const audio = new Audio(response.tts_audio);
-                    await audio.play();
-                } catch (audioError) {
-                    console.error('[ERROR] Failed to play audio:', audioError);
+            // Get AI response
+            const response = await sendToAI(messageData.text);
+            console.log('[DEBUG] Received AI response:', response);
+            
+            if (response && response.response) {
+                const newAIMessage = {
+                    id: Date.now() + 1,
+                    type: 'ai',
+                    text: response.response,
+                    audioUrl: response.tts_audio,
+                    timestamp: new Date().toISOString()
+                };
+                
+                setMessages(prev => [...prev, newAIMessage]);
+                
+                // Play audio if available
+                if (response.tts_audio) {
+                    try {
+                        const audio = new Audio(response.tts_audio);
+                        await audio.play();
+                    } catch (audioError) {
+                        console.error('[ERROR] Failed to play audio:', audioError);
+                    }
                 }
             }
         } catch (error) {
             console.error('[ERROR] Failed to process message:', error);
             setError('Failed to get response from AI. Please try again.');
+            
+            // Remove the user message if AI response failed
+            setMessages(prev => prev.slice(0, -1));
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -54,26 +76,24 @@ export default function Chat() {
         <>
             <Head>
                 <title>Chat with Lord Vader</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1" />
             </Head>
             <div className="page-container">
                 <div className="chat-container">
                     <div className="chat-header">
                         <h1>Chat with Lord Vader</h1>
                     </div>
-                    <div className="messages-container">
+                    <div className="messages-container" ref={messagesContainerRef}>
                         {messages.length === 0 ? (
                             <div className="empty-state">
                                 Begin your conversation with Lord Vader...
                             </div>
                         ) : (
-                            messages.map((msg, index) => (
-                                <div key={index} className="message-group">
-                                    <div className="user-message">
-                                        <p>{msg.text}</p>
-                                    </div>
-                                    <div className="ai-message">
-                                        <p>{msg.response}</p>
-                                        {msg.audioUrl && (
+                            messages.map((msg) => (
+                                <div key={msg.id} className={`message ${msg.type}`}>
+                                    <div className="message-content">
+                                        <div className="message-text">{msg.text}</div>
+                                        {msg.type === 'ai' && msg.audioUrl && (
                                             <div className="audio-controls">
                                                 <audio controls src={msg.audioUrl}>
                                                     Your browser does not support the audio element.
@@ -84,10 +104,20 @@ export default function Chat() {
                                 </div>
                             ))
                         )}
+                        {isLoading && (
+                            <div className="loading-indicator">
+                                <div className="loading-dots">
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                </div>
+                            </div>
+                        )}
                         {error && <div className="error-message">{error}</div>}
+                        <div ref={messagesEndRef} />
                     </div>
                     <div className="input-container">
-                        <ChatInput onMessageSend={handleMessageSend} />
+                        <ChatInput onMessageSend={handleMessageSend} disabled={isLoading} />
                     </div>
                 </div>
             </div>
@@ -99,6 +129,10 @@ export default function Chat() {
                     color: #ffffff;
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
                 }
+
+                * {
+                    box-sizing: border-box;
+                }
             `}</style>
             <style jsx>{`
                 .page-container {
@@ -107,6 +141,7 @@ export default function Chat() {
                     flex-direction: column;
                     background: #000000;
                 }
+
                 .chat-container {
                     flex: 1;
                     max-width: 800px;
@@ -118,17 +153,21 @@ export default function Chat() {
                     flex-direction: column;
                     height: 100vh;
                 }
+
                 .chat-header {
                     text-align: center;
                     margin-bottom: 20px;
                     padding: 20px 0;
                     border-bottom: 1px solid #333;
                 }
+
                 .chat-header h1 {
                     margin: 0;
                     color: #ff0000;
                     text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+                    font-size: 2rem;
                 }
+
                 .messages-container {
                     flex: 1;
                     overflow-y: auto;
@@ -136,53 +175,135 @@ export default function Chat() {
                     background: rgba(255, 0, 0, 0.05);
                     border-radius: 8px;
                     margin-bottom: 20px;
+                    scroll-behavior: smooth;
                 }
+
                 .empty-state {
                     text-align: center;
                     padding: 20px;
                     color: #666;
                     font-style: italic;
                 }
-                .message-group {
+
+                .message {
                     margin-bottom: 20px;
+                    opacity: 0;
+                    transform: translateY(20px);
+                    animation: fadeInUp 0.3s ease forwards;
                 }
-                .user-message {
+
+                @keyframes fadeInUp {
+                    from {
+                        opacity: 0;
+                        transform: translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+
+                .message.user .message-content {
                     background: rgba(255, 255, 255, 0.1);
-                    padding: 15px;
-                    border-radius: 8px;
-                    margin-bottom: 10px;
+                    margin-left: auto;
+                    margin-right: 0;
+                    border-radius: 15px 15px 0 15px;
                 }
-                .ai-message {
+
+                .message.ai .message-content {
                     background: rgba(255, 0, 0, 0.1);
-                    padding: 15px;
-                    border-radius: 8px;
+                    margin-right: auto;
+                    margin-left: 0;
+                    border-radius: 15px 15px 15px 0;
                 }
-                .user-message p,
-                .ai-message p {
+
+                .message-content {
+                    max-width: 80%;
+                    padding: 15px;
+                }
+
+                .message-text {
                     margin: 0;
                     line-height: 1.5;
+                    white-space: pre-wrap;
+                    word-break: break-word;
                 }
+
                 .error-message {
                     color: #ff4444;
                     padding: 10px;
                     margin: 10px 0;
                     border-radius: 4px;
                     background: rgba(255, 68, 68, 0.1);
+                    animation: fadeIn 0.3s ease;
                 }
+
                 .audio-controls {
                     margin-top: 15px;
                 }
+
+                .audio-controls audio {
+                    width: 100%;
+                    height: 40px;
+                    border-radius: 20px;
+                    background: rgba(0, 0, 0, 0.3);
+                }
+
                 .input-container {
                     padding: 20px;
                     background: rgba(255, 0, 0, 0.05);
                     border-radius: 8px;
+                    position: relative;
                 }
-                audio {
-                    width: 100%;
-                    margin-top: 10px;
+
+                .loading-indicator {
+                    display: flex;
+                    justify-content: center;
+                    padding: 20px;
                 }
-                audio::-webkit-media-controls-panel {
-                    background: rgba(255, 0, 0, 0.1);
+
+                .loading-dots {
+                    display: flex;
+                    gap: 8px;
+                }
+
+                .loading-dots span {
+                    width: 8px;
+                    height: 8px;
+                    background: #ff0000;
+                    border-radius: 50%;
+                    animation: bounce 1s infinite;
+                }
+
+                .loading-dots span:nth-child(2) {
+                    animation-delay: 0.2s;
+                }
+
+                .loading-dots span:nth-child(3) {
+                    animation-delay: 0.4s;
+                }
+
+                @keyframes bounce {
+                    0%, 100% {
+                        transform: translateY(0);
+                    }
+                    50% {
+                        transform: translateY(-10px);
+                    }
+                }
+
+                @media (max-width: 600px) {
+                    .chat-container {
+                        padding: 10px;
+                    }
+
+                    .message-content {
+                        max-width: 90%;
+                    }
+
+                    .chat-header h1 {
+                        font-size: 1.5rem;
+                    }
                 }
             `}</style>
         </>

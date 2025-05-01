@@ -1,41 +1,17 @@
 import { useState } from "react";
-import { sendToAI } from "../lib/api";
 
-const ChatInput = ({ onMessageSend }) => {
+const ChatInput = ({ onMessageSend, disabled }) => {
     const [input, setInput] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
 
     // Function to send a message
     const handleSendMessage = async () => {
-        if (!input.trim()) return;
+        if (!input.trim() || disabled) return;
         
-        setLoading(true);
-        setError(null);
-
         try {
-            console.log("[DEBUG] Sending message to API:", input);
-            const response = await sendToAI(input);
-            
-            console.log("[DEBUG] Received response:", response);
-            
-            if (response && response.response) {
-                if (onMessageSend) {
-                    onMessageSend({
-                        text: input,
-                        response: response.response,
-                        timestamp: new Date().toISOString()
-                    });
-                }
-            } else {
-                throw new Error("Invalid response format from API");
-            }
+            await onMessageSend({ text: input.trim() });
+            setInput(""); // Clear input after successful send
         } catch (error) {
-            console.error("[ERROR] API request failed:", error);
-            setError("Failed to send message. Please try again.");
-        } finally {
-            setInput("");
-            setLoading(false);
+            console.error('[ERROR] Failed to send message:', error);
         }
     };
 
@@ -47,8 +23,7 @@ const ChatInput = ({ onMessageSend }) => {
     };
 
     return (
-        <div className="chat-input-container">
-            {error && <div className="error-message">{error}</div>}
+        <div className={`chat-input-container ${disabled ? 'disabled' : ''}`}>
             <input
                 type="text"
                 id="chat-input"
@@ -56,16 +31,97 @@ const ChatInput = ({ onMessageSend }) => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Type a message..."
-                disabled={loading}
+                placeholder={disabled ? "Lord Vader is thinking..." : "Type a message..."}
+                disabled={disabled}
+                className="chat-input-field"
+                autoComplete="off"
             />
             <button 
                 onClick={handleSendMessage} 
-                disabled={!input.trim() || loading}
-                className={loading ? 'loading' : ''}
+                disabled={!input.trim() || disabled}
+                className={`send-button ${disabled ? 'disabled' : ''}`}
             >
-                {loading ? "Sending..." : "Send"}
+                {disabled ? "Waiting..." : "Send"}
             </button>
+            <style jsx>{`
+                .chat-input-container {
+                    display: flex;
+                    gap: 10px;
+                    padding: 15px;
+                    background: rgba(255, 0, 0, 0.1);
+                    border-radius: 8px;
+                    transition: opacity 0.3s ease;
+                }
+
+                .chat-input-container.disabled {
+                    opacity: 0.7;
+                }
+
+                .chat-input-field {
+                    flex: 1;
+                    padding: 12px 16px;
+                    border: 1px solid rgba(255, 0, 0, 0.3);
+                    border-radius: 20px;
+                    background: rgba(0, 0, 0, 0.7);
+                    color: white;
+                    font-size: 16px;
+                    transition: all 0.3s ease;
+                }
+
+                .chat-input-field:focus {
+                    outline: none;
+                    border-color: rgba(255, 0, 0, 0.6);
+                    box-shadow: 0 0 10px rgba(255, 0, 0, 0.2);
+                }
+
+                .chat-input-field:disabled {
+                    background: rgba(0, 0, 0, 0.5);
+                    cursor: not-allowed;
+                }
+
+                .send-button {
+                    padding: 12px 24px;
+                    background: rgba(255, 0, 0, 0.8);
+                    border: none;
+                    border-radius: 20px;
+                    color: white;
+                    font-weight: bold;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    min-width: 100px;
+                    text-transform: uppercase;
+                    font-size: 14px;
+                    letter-spacing: 0.5px;
+                }
+
+                .send-button:hover:not(:disabled) {
+                    background: rgba(255, 0, 0, 1);
+                    transform: translateY(-1px);
+                    box-shadow: 0 2px 8px rgba(255, 0, 0, 0.3);
+                }
+
+                .send-button:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
+                    transform: none;
+                }
+
+                .send-button.disabled {
+                    background: rgba(255, 0, 0, 0.4);
+                }
+
+                @media (max-width: 600px) {
+                    .chat-input-container {
+                        padding: 10px;
+                    }
+
+                    .send-button {
+                        padding: 12px 16px;
+                        min-width: 80px;
+                        font-size: 12px;
+                    }
+                }
+            `}</style>
         </div>
     );
 };
