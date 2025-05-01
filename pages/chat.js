@@ -1,44 +1,42 @@
-import { useEffect, useState } from "react";
-import { authorizedRequest, registerUser, getAuthTokenFromAPI } from "../lib/api";
-import Layout from "../components/Layout";
+import { useState } from 'react';
+import ChatInput from '../components/ChatInput';
+import { sendToAI } from '../lib/api';
 
-const Chat = () => {
+export default function Chat() {
     const [messages, setMessages] = useState([]);
+    const [error, setError] = useState(null);
 
-    useEffect(() => {
-        const initializeUser = async () => {
-            let userId = localStorage.getItem("vader_user_id");
-            if (!userId) {
-                const newUser = await registerUser("anonymous_user");
-                if (newUser?.user_id) {
-                    userId = newUser.user_id;
-                    localStorage.setItem("vader_user_id", userId);
-                }
+    const handleMessageSend = async (messageData) => {
+        try {
+            const response = await sendToAI(messageData.text);
+            
+            if (response && response.response) {
+                setMessages(prev => [...prev, {
+                    text: messageData.text,
+                    response: response.response,
+                    timestamp: new Date().toISOString()
+                }]);
+            } else {
+                throw new Error('Invalid response from API');
             }
-            let token = localStorage.getItem("vader_auth_token");
-            if (!token) {
-                token = await getAuthTokenFromAPI(userId);
-            }
-        };
-
-        initializeUser();
-    }, []);
-
-    useEffect(() => {
-        authorizedRequest("GET", "/messages")
-            .then(response => setMessages(response))
-            .catch(error => console.error("Error fetching messages:", error));
-    }, []);
+        } catch (error) {
+            console.error('[ERROR] GPT API Failed:', error);
+            setError('Failed to get response from AI. Please try again.');
+        }
+    };
 
     return (
-        <Layout>
-            <div className="chat-container">
+        <div className="chat-container">
+            <div className="messages-container">
                 {messages.map((msg, index) => (
-                    <div key={index} className="message">{msg.text}</div>
+                    <div key={index} className="message-group">
+                        <div className="user-message">{msg.text}</div>
+                        <div className="ai-message">{msg.response}</div>
+                    </div>
                 ))}
+                {error && <div className="error-message">{error}</div>}
             </div>
-        </Layout>
+            <ChatInput onMessageSend={handleMessageSend} />
+        </div>
     );
-};
-
-export default Chat;
+}
