@@ -151,12 +151,10 @@ export class ApiClient {
   }
 }
 
-// Create and export a default instance
-const api = new ApiClient({
+// Create and export the API client instance
+export const api = new ApiClient({
   baseUrl: process.env.NEXT_PUBLIC_API_URL!,
   headers: {
     'X-Platform': 'web',
   },
-});
-
-export default api; 
+}); 
