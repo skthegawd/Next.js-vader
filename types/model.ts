@@ -1,16 +1,28 @@
 export interface ModelParameters {
-  temperature: number;
-  max_tokens: number;
-  top_p: number;
-  frequency_penalty: number;
-  presence_penalty: number;
-  [key: string]: any; // For any additional parameters
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  max_tokens?: number;
+  presence_penalty?: number;
+  frequency_penalty?: number;
+  stop?: string[];
+  [key: string]: any;
+}
+
+export interface ModelConfig {
+  model_type: string;
+  parameters: ModelParameters;
+  capabilities: string[];
+  max_context_length: number;
+  supported_parameters: string[];
 }
 
 export interface ModelMetrics {
-  requests_per_minute: number;
+  requests_total: number;
+  requests_successful: number;
+  requests_failed: number;
   average_latency: number;
-  error_rate: number;
+  tokens_total: number;
   uptime: number;
 }
 
@@ -22,8 +34,10 @@ export interface ModelHealth {
 }
 
 export interface ModelStatus {
-  model_type: string;
-  parameters: ModelParameters;
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  message?: string;
+  error?: string;
+  config: ModelConfig;
   metrics: ModelMetrics;
   health: ModelHealth;
   last_updated: string;

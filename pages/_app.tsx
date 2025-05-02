@@ -6,6 +6,7 @@ import { AuthProvider } from "../context/AuthContext";
 import api from '../lib/api';
 import ws from '../lib/websocket';
 import themeManager from '../lib/theme';
+import { WebSocketProvider } from '../context/WebSocketContext';
 
 function MyApp({ Component, pageProps }: AppProps) {
     useEffect(() => {
@@ -62,11 +63,13 @@ function MyApp({ Component, pageProps }: AppProps) {
     }, []);
 
     return (
-        <AuthProvider>
-            <Layout>
-                <Component {...pageProps} />
-            </Layout>
-        </AuthProvider>
+        <WebSocketProvider>
+            <AuthProvider>
+                <Layout>
+                    <Component {...pageProps} />
+                </Layout>
+            </AuthProvider>
+        </WebSocketProvider>
     );
 }
 

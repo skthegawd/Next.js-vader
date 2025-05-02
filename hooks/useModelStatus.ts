@@ -1,23 +1,37 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { WebSocketManager } from '../lib/websocket';
 import { ModelStatus } from '../types/model';
-import { modelStatusWs } from '../lib/websocket';
+import { WSMessage } from '../types/websocket';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || '';
 const POLLING_INTERVAL = 30000; // 30 seconds
 
-export const useModelStatus = () => {
+interface UseModelStatusOptions {
+  autoConnect?: boolean;
+  enablePolling?: boolean;
+  onConnected?: () => void;
+  onDisconnected?: () => void;
+  onError?: (error: Error) => void;
+}
+
+export const useModelStatus = (options: UseModelStatusOptions = {}) => {
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
+  const [isConnected, setIsConnected] = useState(false);
+  const wsRef = useRef<WebSocketManager | null>(null);
+  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchModelStatus = useCallback(async () => {
     try {
-      console.debug('[ModelStatus] Fetching model status...');
+      console.debug('[ModelStatus] Fetching status...');
       const response = await fetch(`${API_BASE_URL}/model-status`);
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
       const data = await response.json();
       console.debug('[ModelStatus] Received status update:', data);
       setModelStatus(data);
@@ -25,77 +39,97 @@ export const useModelStatus = () => {
     } catch (err) {
       console.error('[ModelStatus] Error fetching status:', err);
       setError(err as Error);
+      options.onError?.(err as Error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [options]);
 
   const startPolling = useCallback(() => {
+    if (!options.enablePolling) return;
+    
     console.debug('[ModelStatus] Starting polling...');
-    const intervalId = setInterval(fetchModelStatus, POLLING_INTERVAL);
+    pollTimeoutRef.current = setInterval(fetchModelStatus, POLLING_INTERVAL);
+    
     return () => {
-      console.debug('[ModelStatus] Stopping polling...');
-      clearInterval(intervalId);
-    };
-  }, [fetchModelStatus]);
-
-  useEffect(() => {
-    let pollCleanup: (() => void) | null = null;
-
-    const setupWebSocket = async () => {
-      try {
-        // Setup WebSocket handlers
-        modelStatusWs.onMessage((data: ModelStatus) => {
-          console.debug('[ModelStatus] Received WebSocket update:', data);
-          setModelStatus(data);
-          setError(null);
-        });
-
-        modelStatusWs.onError((error) => {
-          console.error('[ModelStatus] WebSocket error:', error);
-          setError(error);
-        });
-
-        modelStatusWs.onStatus((status) => {
-          console.debug('[ModelStatus] WebSocket status:', status);
-          setConnectionStatus(status);
-          
-          // Start/stop polling based on connection status
-          if (status === 'disconnected' || status === 'error') {
-            if (!pollCleanup) {
-              pollCleanup = startPolling();
-            }
-          } else if (status === 'connected') {
-            if (pollCleanup) {
-              pollCleanup();
-              pollCleanup = null;
-            }
-          }
-        });
-
-        // Initial fetch and connect
-        await fetchModelStatus();
-        await modelStatusWs.connect();
-      } catch (error) {
-        console.error('[ModelStatus] Setup error:', error);
-        setError(error as Error);
-        // Start polling on initial connection failure
-        pollCleanup = startPolling();
+      if (pollTimeoutRef.current) {
+        console.debug('[ModelStatus] Stopping polling...');
+        clearInterval(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
       }
     };
+  }, [fetchModelStatus, options.enablePolling]);
 
-    setupWebSocket();
+  const handleMessage = useCallback((data: ModelStatus) => {
+    console.debug('[ModelStatus] Received WebSocket update:', data);
+    setModelStatus(data);
+    setError(null);
+  }, []);
 
-    // Cleanup
-    return () => {
-      if (pollCleanup) {
-        pollCleanup();
+  const handleStatus = useCallback((status: 'connecting' | 'connected' | 'disconnected' | 'error') => {
+    console.debug('[ModelStatus] WebSocket status:', status);
+    setIsConnected(status === 'connected');
+    
+    if (status === 'connected') {
+      options.onConnected?.();
+      if (pollTimeoutRef.current) {
+        clearInterval(pollTimeoutRef.current);
+        pollTimeoutRef.current = null;
       }
-      modelStatusWs.disconnect();
-    };
-  }, [fetchModelStatus, startPolling]);
+    } else if (status === 'disconnected') {
+      options.onDisconnected?.();
+      startPolling();
+    }
+  }, [options, startPolling]);
 
-  const updateModelParameters = async (modelType: string, parameters: any) => {
+  const handleError = useCallback((err: Error) => {
+    console.error('[ModelStatus] Error:', err);
+    setError(err);
+    options.onError?.(err);
+  }, [options]);
+
+  const connect = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      if (!wsRef.current) {
+        wsRef.current = new WebSocketManager(WS_URL, 'model-status', {
+          autoReconnect: true,
+          reconnectInterval: 1000,
+          maxReconnectAttempts: 5,
+          pingInterval: 30000,
+          connectionTimeout: 10000
+        });
+      }
+
+      wsRef.current.onMessage(handleMessage);
+      wsRef.current.onStatus(handleStatus);
+      wsRef.current.onError(handleError);
+
+      await wsRef.current.connect();
+      await fetchModelStatus(); // Get initial status
+    } catch (err) {
+      handleError(err as Error);
+      startPolling(); // Fallback to polling on connection failure
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchModelStatus, handleMessage, handleStatus, handleError, startPolling]);
+
+  const disconnect = useCallback(() => {
+    wsRef.current?.disconnect();
+    wsRef.current = null;
+    setIsConnected(false);
+    setError(null);
+    
+    if (pollTimeoutRef.current) {
+      clearInterval(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
+  }, []);
+
+  const updateModelParameters = useCallback(async (modelType: string, parameters: any) => {
     try {
       console.debug('[ModelStatus] Updating parameters:', { modelType, parameters });
       const response = await fetch(`${API_BASE_URL}/model-status/${modelType}/parameters`, {
@@ -116,17 +150,29 @@ export const useModelStatus = () => {
       return updatedStatus;
     } catch (err) {
       console.error('[ModelStatus] Error updating parameters:', err);
-      setError(err as Error);
+      handleError(err as Error);
       throw err;
     }
-  };
+  }, [handleError]);
+
+  // Auto-connect if enabled
+  useEffect(() => {
+    if (options.autoConnect) {
+      connect();
+    }
+
+    return () => {
+      disconnect();
+    };
+  }, [options.autoConnect, connect, disconnect]);
 
   return {
     modelStatus,
     error,
     isLoading,
-    isWebSocketConnected: connectionStatus === 'connected',
-    connectionStatus,
+    isConnected,
+    connect,
+    disconnect,
     updateModelParameters,
     refreshStatus: fetchModelStatus,
   };

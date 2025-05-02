@@ -1,27 +1,21 @@
+import { 
+  WSMessage, 
+  WSCommandMessage, 
+  WSStatusMessage, 
+  WSStreamMessage, 
+  WSErrorMessage,
+  WSConfig,
+  MessageType
+} from '../types/websocket';
 import { ModelStatus } from '../types/model';
 
-interface WebSocketConfig {
-  url: string;
-  token?: string;
-  clientId?: string;
-  endpoint: 'model-status' | 'terminal';
-  onMessage?: (data: any) => void;
-  onStatusChange?: (status: WebSocketStatus) => void;
-}
-
 type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
-
-interface WebSocketMessage {
-  type: 'model_status' | 'terminal_output' | 'error' | 'ping' | 'pong';
-  data: any;
-  timestamp: string;
-}
 
 export class WebSocketManager {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectTimeout = 1000; // Start with 1 second
+  private maxReconnectAttempts: number;
+  private reconnectTimeout: number;
   private onMessageCallback: ((data: any) => void) | null = null;
   private onErrorCallback: ((error: Error) => void) | null = null;
   private onStatusCallback: ((status: WebSocketStatus) => void) | null = null;
@@ -31,11 +25,19 @@ export class WebSocketManager {
   private endpoint: 'model-status' | 'terminal';
   private isConnecting = false;
   private shouldReconnect = true;
+  private connectionTimeout: number;
+  private pingIntervalTime: number;
 
-  constructor(private baseUrl: string, endpoint: 'model-status' | 'terminal') {
+  constructor(private baseUrl: string, endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>) {
     this.token = localStorage.getItem('auth_token') || process.env.NEXT_PUBLIC_API_TOKEN || null;
     this.endpoint = endpoint;
     this.clientId = this.generateClientId();
+    
+    // Initialize configuration with defaults or provided values
+    this.maxReconnectAttempts = config?.maxReconnectAttempts || 5;
+    this.reconnectTimeout = config?.reconnectInterval || 1000;
+    this.connectionTimeout = config?.connectionTimeout || 10000;
+    this.pingIntervalTime = config?.pingInterval || 30000;
   }
 
   private generateClientId(): string {
@@ -43,31 +45,15 @@ export class WebSocketManager {
     return `${prefix}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  setToken(token: string) {
-    this.token = token;
-    localStorage.setItem('auth_token', token);
-  }
-
   private getWebSocketUrl(): string {
     try {
       const url = new URL(this.baseUrl);
       
-      // Ensure we're using wss:// for HTTPS sites
-      if (url.protocol === 'https:') {
-        url.protocol = 'wss:';
-      } else {
-        url.protocol = 'ws:';
-      }
-
-      // Remove any trailing slashes from the base URL
+      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
       url.pathname = url.pathname.replace(/\/+$/, '');
       
       // Construct the proper path based on endpoint type
-      if (this.endpoint === 'model-status') {
-        url.pathname = `${url.pathname}/model-status/${this.clientId}`;
-      } else {
-        url.pathname = `${url.pathname}/terminal/${this.clientId}`;
-      }
+      url.pathname = `${url.pathname}/ws/${this.endpoint}/${this.clientId}`;
 
       // Add authentication token if available
       if (this.token) {
@@ -85,6 +71,134 @@ export class WebSocketManager {
     } catch (error) {
       console.error('Error constructing WebSocket URL:', error);
       throw error;
+    }
+  }
+
+  private handleMessage(event: MessageEvent) {
+    try {
+      const message = JSON.parse(event.data) as WSMessage;
+      
+      switch (message.type) {
+        case 'pong':
+          console.debug(`[WebSocket ${this.endpoint}] Received pong`);
+          break;
+
+        case 'status':
+          const statusMsg = message as WSStatusMessage;
+          this.handleStatusMessage(statusMsg);
+          break;
+
+        case 'error':
+          const errorMsg = message as WSErrorMessage;
+          this.handleError(new Error(errorMsg.error || 'Unknown error'));
+          break;
+
+        case 'stream':
+          const streamMsg = message as WSStreamMessage;
+          if (this.onMessageCallback) {
+            this.onMessageCallback(streamMsg.data);
+          }
+          break;
+
+        case 'message':
+        case 'response':
+          if (this.onMessageCallback) {
+            this.onMessageCallback(message.data);
+          }
+          break;
+
+        default:
+          console.warn(`[WebSocket ${this.endpoint}] Unhandled message type:`, message.type);
+      }
+    } catch (error) {
+      console.error(`[WebSocket ${this.endpoint}] Error parsing message:`, error);
+      this.handleError(error as Error);
+    }
+  }
+
+  private handleStatusMessage(message: WSStatusMessage) {
+    const status = message.data.status;
+    this.updateStatus(status);
+    
+    if (status === 'error' && message.data.message) {
+      this.handleError(new Error(message.data.message));
+    }
+  }
+
+  private setupEventListeners() {
+    if (!this.ws) return;
+
+    this.ws.onopen = () => {
+      console.debug(`[WebSocket ${this.endpoint}] Connected`);
+      this.reconnectAttempts = 0;
+      this.updateStatus('connected');
+      this.startPingInterval();
+
+      // Send initial subscription message
+      this.sendMessage({
+        type: 'status',
+        data: { status: 'connected' },
+        client_id: this.clientId,
+        timestamp: new Date().toISOString()
+      });
+    };
+
+    this.ws.onmessage = this.handleMessage.bind(this);
+
+    this.ws.onerror = (error) => {
+      console.error(`[WebSocket ${this.endpoint}] Error:`, error);
+      this.handleError(error as Error);
+    };
+
+    this.ws.onclose = (event) => {
+      console.debug(`[WebSocket ${this.endpoint}] Closed:`, event.code, event.reason);
+      this.updateStatus('disconnected');
+      this.stopPingInterval();
+      
+      if (this.shouldReconnect && event.code !== 1000 && event.code !== 1008) {
+        this.handleReconnect();
+      }
+    };
+  }
+
+  private sendMessage(message: WSMessage) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+    } else {
+      console.warn(`[WebSocket ${this.endpoint}] Cannot send message - connection not open`);
+    }
+  }
+
+  async sendCommand(command: string, args: string[] = [], watch = false) {
+    const message: WSCommandMessage = {
+      type: 'command',
+      command,
+      args,
+      watch,
+      client_id: this.clientId,
+      timestamp: new Date().toISOString(),
+      data: null
+    };
+
+    this.sendMessage(message);
+  }
+
+  private startPingInterval() {
+    this.stopPingInterval();
+    this.pingInterval = setInterval(() => {
+      this.sendMessage({
+        type: 'ping',
+        data: null,
+        client_id: this.clientId,
+        timestamp: new Date().toISOString()
+      });
+    }, this.pingIntervalTime);
+  }
+
+  private stopPingInterval() {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
     }
   }
 
@@ -119,7 +233,7 @@ export class WebSocketManager {
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error('Connection timeout'));
-        }, 10000); // 10 second timeout
+        }, this.connectionTimeout);
 
         if (!this.ws) {
           clearTimeout(timeout);
@@ -146,72 +260,6 @@ export class WebSocketManager {
     }
   }
 
-  private setupEventListeners() {
-    if (!this.ws) return;
-
-    this.ws.onopen = () => {
-      console.debug(`[WebSocket ${this.endpoint}] Connected`);
-      this.reconnectAttempts = 0;
-      this.updateStatus('connected');
-      this.startPingInterval();
-
-      // Send initial subscription for model-status endpoint
-      if (this.endpoint === 'model-status') {
-        this.ws?.send(JSON.stringify({ 
-          type: 'subscribe',
-          client_id: this.clientId,
-          timestamp: new Date().toISOString()
-        }));
-      }
-    };
-
-    this.ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data) as WebSocketMessage;
-        
-        switch (data.type) {
-          case 'pong':
-            // Reset connection monitoring
-            break;
-          case 'error':
-            if (data.data?.auth === false) {
-              console.error(`[WebSocket ${this.endpoint}] Authentication failed`);
-              this.shouldReconnect = false;
-              this.disconnect();
-              this.handleError(new Error('Authentication failed'));
-              return;
-            }
-            this.handleError(new Error(data.data.message || 'Unknown error'));
-            break;
-          case 'model_status':
-          case 'terminal_output':
-            if (this.onMessageCallback) {
-              this.onMessageCallback(data.data);
-            }
-            break;
-        }
-      } catch (error) {
-        console.error(`[WebSocket ${this.endpoint}] Error parsing message:`, error);
-      }
-    };
-
-    this.ws.onerror = (error) => {
-      console.error(`[WebSocket ${this.endpoint}] Error:`, error);
-      this.handleError(error as Error);
-    };
-
-    this.ws.onclose = (event) => {
-      console.debug(`[WebSocket ${this.endpoint}] Closed:`, event.code, event.reason);
-      this.updateStatus('disconnected');
-      this.stopPingInterval();
-      
-      // Don't reconnect if closed intentionally or due to auth failure
-      if (this.shouldReconnect && event.code !== 1000 && event.code !== 1008) {
-        this.handleReconnect();
-      }
-    };
-  }
-
   private handleError(error: Error) {
     this.updateStatus('error');
     if (this.onErrorCallback) {
@@ -226,7 +274,7 @@ export class WebSocketManager {
     }
 
     this.reconnectAttempts++;
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    const delay = Math.min(this.reconnectTimeout * Math.pow(2, this.reconnectAttempts), 30000);
     
     console.debug(`[WebSocket ${this.endpoint}] Reconnecting in ${delay}ms (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
     
@@ -239,49 +287,12 @@ export class WebSocketManager {
     }
   }
 
-  private startPingInterval() {
-    this.stopPingInterval(); // Clear any existing interval
-    this.pingInterval = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ 
-          type: 'ping',
-          client_id: this.clientId,
-          timestamp: new Date().toISOString()
-        }));
-      }
-    }, 30000); // Send ping every 30 seconds
-  }
-
-  private stopPingInterval() {
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-      this.pingInterval = null;
-    }
-  }
-
   onMessage(callback: (data: any) => void) {
     this.onMessageCallback = callback;
   }
 
   onError(callback: (error: Error) => void) {
     this.onErrorCallback = callback;
-  }
-
-  sendCommand(command: string, args: string[] = [], watch = false) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error('WebSocket not connected');
-    }
-    if (this.endpoint !== 'terminal') {
-      throw new Error('Cannot send commands on non-terminal WebSocket');
-    }
-    this.ws.send(JSON.stringify({ 
-      type: 'command',
-      command,
-      args,
-      watch,
-      client_id: this.clientId,
-      timestamp: new Date().toISOString()
-    }));
   }
 
   disconnect() {
