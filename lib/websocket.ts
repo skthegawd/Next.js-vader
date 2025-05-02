@@ -24,10 +24,13 @@ export class WebSocketManager {
   private reconnectTimeout = 1000; // Start with 1 second
   private onMessageCallback: ((data: any) => void) | null = null;
   private onErrorCallback: ((error: Error) => void) | null = null;
+  private onStatusCallback: ((status: WebSocketStatus) => void) | null = null;
   private pingInterval: NodeJS.Timeout | null = null;
   private token: string | null = null;
   private clientId: string;
   private endpoint: 'model-status' | 'terminal';
+  private isConnecting = false;
+  private shouldReconnect = true;
 
   constructor(private baseUrl: string, endpoint: 'model-status' | 'terminal') {
     this.token = localStorage.getItem('auth_token') || process.env.NEXT_PUBLIC_API_TOKEN || null;
@@ -46,32 +49,85 @@ export class WebSocketManager {
   }
 
   private getWebSocketUrl(): string {
-    const url = new URL(this.baseUrl);
-    
-    // Construct the proper path based on endpoint type
-    if (this.endpoint === 'model-status') {
-      url.pathname = `/ws/model-status`;
-      url.searchParams.append('client_id', this.clientId);
-    } else {
-      url.pathname = `/ws/${this.clientId}`;
-    }
+    try {
+      const url = new URL(this.baseUrl);
+      
+      // Ensure we're using wss:// for HTTPS sites
+      if (url.protocol === 'https:') {
+        url.protocol = 'wss:';
+      } else {
+        url.protocol = 'ws:';
+      }
+      
+      // Construct the proper path based on endpoint type
+      if (this.endpoint === 'model-status') {
+        url.pathname = `/ws/model-status`;
+        url.searchParams.append('client_id', this.clientId);
+      } else {
+        url.pathname = `/ws/${this.clientId}`;
+      }
 
-    // Add authentication token if available
-    if (this.token) {
-      url.searchParams.append('token', this.token);
-    }
+      // Add authentication token if available
+      if (this.token) {
+        url.searchParams.append('token', this.token);
+      }
 
-    return url.toString();
+      return url.toString();
+    } catch (error) {
+      console.error('Error constructing WebSocket URL:', error);
+      throw error;
+    }
   }
 
-  connect() {
+  onStatus(callback: (status: WebSocketStatus) => void) {
+    this.onStatusCallback = callback;
+  }
+
+  private updateStatus(status: WebSocketStatus) {
+    if (this.onStatusCallback) {
+      this.onStatusCallback(status);
+    }
+    console.debug(`[WebSocket ${this.endpoint}] Status: ${status}`);
+  }
+
+  async connect(): Promise<void> {
+    if (this.isConnecting || (this.ws?.readyState === WebSocket.OPEN)) {
+      return;
+    }
+
+    this.isConnecting = true;
+    this.shouldReconnect = true;
+    this.updateStatus('connecting');
+
     try {
       const wsUrl = this.getWebSocketUrl();
+      console.debug(`[WebSocket ${this.endpoint}] Connecting to ${wsUrl}`);
+      
       this.ws = new WebSocket(wsUrl);
       this.setupEventListeners();
+
+      // Wait for connection or error
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Connection timeout'));
+        }, 10000); // 10 second timeout
+
+        this.ws!.onopen = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+
+        this.ws!.onerror = (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        };
+      });
     } catch (error) {
-      console.error('WebSocket connection error:', error);
-      this.handleReconnect();
+      console.error(`[WebSocket ${this.endpoint}] Connection error:`, error);
+      this.handleError(error as Error);
+      throw error;
+    } finally {
+      this.isConnecting = false;
     }
   }
 
@@ -79,8 +135,9 @@ export class WebSocketManager {
     if (!this.ws) return;
 
     this.ws.onopen = () => {
-      console.log(`WebSocket connected (${this.endpoint})`);
+      console.debug(`[WebSocket ${this.endpoint}] Connected`);
       this.reconnectAttempts = 0;
+      this.updateStatus('connected');
       this.startPingInterval();
 
       // Send initial subscription for model-status endpoint
@@ -95,17 +152,17 @@ export class WebSocketManager {
         
         switch (data.type) {
           case 'pong':
-            // Handle pong response
+            // Reset connection monitoring
             break;
           case 'error':
             if (data.data?.auth === false) {
-              console.error('WebSocket authentication failed');
+              console.error(`[WebSocket ${this.endpoint}] Authentication failed`);
+              this.shouldReconnect = false;
               this.disconnect();
+              this.handleError(new Error('Authentication failed'));
               return;
             }
-            if (this.onErrorCallback) {
-              this.onErrorCallback(new Error(data.data.message || 'Unknown error'));
-            }
+            this.handleError(new Error(data.data.message || 'Unknown error'));
             break;
           case 'model_status':
           case 'terminal_output':
@@ -115,47 +172,62 @@ export class WebSocketManager {
             break;
         }
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+        console.error(`[WebSocket ${this.endpoint}] Error parsing message:`, error);
       }
     };
 
     this.ws.onerror = (error) => {
-      console.error(`WebSocket error (${this.endpoint}):`, error);
-      if (this.onErrorCallback) {
-        this.onErrorCallback(error as Error);
-      }
+      console.error(`[WebSocket ${this.endpoint}] Error:`, error);
+      this.handleError(error as Error);
     };
 
     this.ws.onclose = (event) => {
-      console.log(`WebSocket closed (${this.endpoint}):`, event.code, event.reason);
+      console.debug(`[WebSocket ${this.endpoint}] Closed:`, event.code, event.reason);
+      this.updateStatus('disconnected');
       this.stopPingInterval();
       
-      // Don't reconnect if closed due to auth failure
-      if (event.code !== 1008) {
+      // Don't reconnect if closed intentionally or due to auth failure
+      if (this.shouldReconnect && event.code !== 1000 && event.code !== 1008) {
         this.handleReconnect();
       }
     };
   }
 
-  private handleReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
+  private handleError(error: Error) {
+    this.updateStatus('error');
+    if (this.onErrorCallback) {
+      this.onErrorCallback(error);
+    }
+  }
+
+  private async handleReconnect() {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts || !this.shouldReconnect) {
+      console.error(`[WebSocket ${this.endpoint}] Max reconnection attempts reached`);
       return;
     }
 
     this.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
     
-    setTimeout(() => {
-      console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-      this.connect();
-    }, delay);
+    console.debug(`[WebSocket ${this.endpoint}] Reconnecting in ${delay}ms (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    try {
+      await this.connect();
+    } catch (error) {
+      console.error(`[WebSocket ${this.endpoint}] Reconnection failed:`, error);
+    }
   }
 
   private startPingInterval() {
+    this.stopPingInterval(); // Clear any existing interval
     this.pingInterval = setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ type: 'ping', timestamp: new Date().toISOString() }));
+        this.ws.send(JSON.stringify({ 
+          type: 'ping',
+          timestamp: new Date().toISOString()
+        }));
       }
     }, 30000); // Send ping every 30 seconds
   }
@@ -186,14 +258,18 @@ export class WebSocketManager {
   }
 
   disconnect() {
+    this.shouldReconnect = false;
     this.stopPingInterval();
     if (this.ws) {
-      this.ws.close();
+      this.ws.close(1000, 'Disconnected by client');
       this.ws = null;
     }
   }
 }
 
 // Create and export default instances for both endpoints
-export const modelStatusWs = new WebSocketManager(process.env.NEXT_PUBLIC_WS_URL!, 'model-status');
-export const terminalWs = new WebSocketManager(process.env.NEXT_PUBLIC_WS_URL!, 'terminal'); 
+const baseUrl = process.env.NEXT_PUBLIC_WS_URL!;
+console.debug('[WebSocket] Initializing with base URL:', baseUrl);
+
+export const modelStatusWs = new WebSocketManager(baseUrl, 'model-status');
+export const terminalWs = new WebSocketManager(baseUrl, 'terminal'); 

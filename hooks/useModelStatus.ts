@@ -9,61 +9,95 @@ export const useModelStatus = () => {
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isWebSocketConnected, setIsWebSocketConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
 
   const fetchModelStatus = useCallback(async () => {
     try {
+      console.debug('[ModelStatus] Fetching model status...');
       const response = await fetch(`${API_BASE_URL}/model-status`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
+      console.debug('[ModelStatus] Received status update:', data);
       setModelStatus(data);
       setError(null);
     } catch (err) {
+      console.error('[ModelStatus] Error fetching status:', err);
       setError(err as Error);
-      console.error('Error fetching model status:', err);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   const startPolling = useCallback(() => {
+    console.debug('[ModelStatus] Starting polling...');
     const intervalId = setInterval(fetchModelStatus, POLLING_INTERVAL);
-    return () => clearInterval(intervalId);
+    return () => {
+      console.debug('[ModelStatus] Stopping polling...');
+      clearInterval(intervalId);
+    };
   }, [fetchModelStatus]);
 
   useEffect(() => {
-    // Initial fetch
-    fetchModelStatus();
+    let pollCleanup: (() => void) | null = null;
 
-    // Setup WebSocket
-    modelStatusWs.onMessage((data: ModelStatus) => {
-      setModelStatus(data);
-      setIsWebSocketConnected(true);
-      setError(null);
-    });
+    const setupWebSocket = async () => {
+      try {
+        // Setup WebSocket handlers
+        modelStatusWs.onMessage((data: ModelStatus) => {
+          console.debug('[ModelStatus] Received WebSocket update:', data);
+          setModelStatus(data);
+          setError(null);
+        });
 
-    modelStatusWs.onError((error) => {
-      console.error('WebSocket error:', error);
-      setIsWebSocketConnected(false);
-      setError(error);
-      // Start polling as fallback
-      const cleanup = startPolling();
-      return () => cleanup();
-    });
+        modelStatusWs.onError((error) => {
+          console.error('[ModelStatus] WebSocket error:', error);
+          setError(error);
+        });
 
-    // Connect WebSocket
-    modelStatusWs.connect();
+        modelStatusWs.onStatus((status) => {
+          console.debug('[ModelStatus] WebSocket status:', status);
+          setConnectionStatus(status);
+          
+          // Start/stop polling based on connection status
+          if (status === 'disconnected' || status === 'error') {
+            if (!pollCleanup) {
+              pollCleanup = startPolling();
+            }
+          } else if (status === 'connected') {
+            if (pollCleanup) {
+              pollCleanup();
+              pollCleanup = null;
+            }
+          }
+        });
+
+        // Initial fetch and connect
+        await fetchModelStatus();
+        await modelStatusWs.connect();
+      } catch (error) {
+        console.error('[ModelStatus] Setup error:', error);
+        setError(error as Error);
+        // Start polling on initial connection failure
+        pollCleanup = startPolling();
+      }
+    };
+
+    setupWebSocket();
 
     // Cleanup
     return () => {
+      if (pollCleanup) {
+        pollCleanup();
+      }
       modelStatusWs.disconnect();
     };
-  }, [startPolling]);
+  }, [fetchModelStatus, startPolling]);
 
   const updateModelParameters = async (modelType: string, parameters: any) => {
     try {
+      console.debug('[ModelStatus] Updating parameters:', { modelType, parameters });
       const response = await fetch(`${API_BASE_URL}/model-status/${modelType}/parameters`, {
         method: 'POST',
         headers: {
@@ -77,9 +111,11 @@ export const useModelStatus = () => {
       }
 
       const updatedStatus = await response.json();
+      console.debug('[ModelStatus] Parameters updated:', updatedStatus);
       setModelStatus(updatedStatus);
       return updatedStatus;
     } catch (err) {
+      console.error('[ModelStatus] Error updating parameters:', err);
       setError(err as Error);
       throw err;
     }
@@ -89,7 +125,8 @@ export const useModelStatus = () => {
     modelStatus,
     error,
     isLoading,
-    isWebSocketConnected,
+    isWebSocketConnected: connectionStatus === 'connected',
+    connectionStatus,
     updateModelParameters,
     refreshStatus: fetchModelStatus,
   };
