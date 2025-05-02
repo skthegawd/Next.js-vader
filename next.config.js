@@ -16,6 +16,10 @@ const nextConfig = {
                 source: '/api/:path*',
                 destination: `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/:path*`,
             },
+            {
+                source: '/ws',
+                destination: `${process.env.NEXT_PUBLIC_WS_URL}`,
+            },
         ];
     },
 
@@ -23,12 +27,13 @@ const nextConfig = {
     async headers() {
         return [
             {
-                source: '/api/:path*',
+                source: '/:path*',
                 headers: [
                     { key: 'Access-Control-Allow-Origin', value: '*' },
                     { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, OPTIONS' },
-                    { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization, Accept' },
+                    { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization, Accept, X-Requested-With' },
                     { key: 'Access-Control-Max-Age', value: '86400' },
+                    { key: 'Access-Control-Allow-Credentials', value: 'true' },
                 ],
             },
         ];
@@ -50,6 +55,7 @@ const nextConfig = {
     
     // Ensure images are handled correctly
     images: {
+        domains: ['vader-yp5n.onrender.com'],
         unoptimized: true,
     },
 

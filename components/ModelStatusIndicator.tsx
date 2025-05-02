@@ -17,15 +17,18 @@ export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ onSt
   const [status, setStatus] = useState<ModelStatus | null>(null);
   const [wsStatus, setWsStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStatus = async () => {
       try {
+        setError(null);
         const modelStatus = await getModelStatus();
         setStatus(modelStatus);
         onStatusChange?.(modelStatus);
       } catch (error) {
         console.error('Failed to fetch model status:', error);
+        setError('Failed to fetch model status. Retrying...');
       } finally {
         setIsLoading(false);
       }
@@ -45,7 +48,12 @@ export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ onSt
           onStatusChange?.(data.status);
         }
       },
-      (connectionStatus) => setWsStatus(connectionStatus)
+      (connectionStatus) => {
+        setWsStatus(connectionStatus);
+        if (connectionStatus === 'connected') {
+          setError(null);
+        }
+      }
     );
 
     return () => {
@@ -54,47 +62,78 @@ export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ onSt
     };
   }, [onStatusChange]);
 
-  if (isLoading) {
-    return <div className="model-status-loading">Loading model status...</div>;
-  }
-
   return (
     <div className="model-status-indicator">
       <div className="status-header">
         <h3>Model Status</h3>
-        <div className={`ws-indicator ${wsStatus}`}>
-          {wsStatus === 'connected' ? '●' : wsStatus === 'error' ? '⚠' : '○'}
-        </div>
+        <div className={`status-indicator ${wsStatus}`} title={`WebSocket: ${wsStatus}`} />
       </div>
       
-      {status && (
-        <div className="status-details">
-          <div className="status-item">
-            <span>GPT Model:</span>
-            <strong>{status.gptModel}</strong>
-          </div>
-          <div className="status-item">
-            <span>Voice Model:</span>
-            <strong>{status.voiceModel}</strong>
-          </div>
-          <div className="status-item">
-            <span>Streaming:</span>
-            <strong>{status.isStreaming ? 'Enabled' : 'Disabled'}</strong>
-          </div>
-          <div className="status-item">
-            <span>Temperature:</span>
-            <strong>{status.temperature.toFixed(2)}</strong>
-          </div>
-          <div className="status-item">
-            <span>Max Tokens:</span>
-            <strong>{status.maxTokens}</strong>
-          </div>
+      {error && (
+        <div className="error-message">
+          {error}
         </div>
       )}
 
+      {isLoading ? (
+        <div className="loading-status">
+          <div className="loading-spinner" />
+          <span>Loading model status...</span>
+        </div>
+      ) : status ? (
+        <div className="status-details">
+          <div className="status-item">
+            <span>GPT Model:</span>
+            <strong>{status.gptModel || 'Not available'}</strong>
+          </div>
+          <div className="status-item">
+            <span>Voice Model:</span>
+            <strong>{status.voiceModel || 'Not available'}</strong>
+          </div>
+          <div className="status-item">
+            <span>Streaming:</span>
+            <div className="toggle-switch">
+              <input
+                type="checkbox"
+                checked={status.isStreaming}
+                onChange={() => {}} // Handled by parent
+                id="streaming-toggle"
+              />
+              <label className="toggle-slider" htmlFor="streaming-toggle" />
+            </div>
+          </div>
+          <div className="status-item">
+            <span>Temperature:</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              value={status.temperature}
+              onChange={() => {}} // Handled by parent
+              className="temperature-slider"
+            />
+            <strong>{status.temperature.toFixed(1)}</strong>
+          </div>
+          <div className="status-item">
+            <span>Max Tokens:</span>
+            <input
+              type="range"
+              min="100"
+              max="4000"
+              step="100"
+              value={status.maxTokens}
+              onChange={() => {}} // Handled by parent
+              className="tokens-slider"
+            />
+            <strong>{status.maxTokens}</strong>
+          </div>
+        </div>
+      ) : null}
+
       <style jsx>{`
         .model-status-indicator {
-          background: #1a1a1a;
+          background: var(--surface-color);
           border-radius: 8px;
           padding: 1rem;
           margin: 1rem 0;
@@ -108,14 +147,37 @@ export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ onSt
           margin-bottom: 1rem;
         }
 
-        .ws-indicator {
-          font-size: 1.2rem;
-          transition: color 0.3s ease;
+        .error-message {
+          color: var(--error-color);
+          padding: 0.5rem;
+          margin-bottom: 1rem;
+          border-radius: 4px;
+          background: rgba(255, 82, 82, 0.1);
         }
 
-        .ws-indicator.connected { color: #4CAF50; }
-        .ws-indicator.disconnected { color: #9e9e9e; }
-        .ws-indicator.error { color: #f44336; }
+        .loading-status {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          padding: 1rem;
+          color: var(--text-color);
+          opacity: 0.7;
+        }
+
+        .loading-spinner {
+          width: 20px;
+          height: 20px;
+          border: 2px solid transparent;
+          border-top-color: var(--secondary-color);
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
 
         .status-details {
           display: grid;
@@ -131,10 +193,15 @@ export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ onSt
           border-radius: 4px;
         }
 
-        .model-status-loading {
-          text-align: center;
-          padding: 1rem;
-          color: #9e9e9e;
+        .temperature-slider,
+        .tokens-slider {
+          flex: 1;
+          margin: 0 1rem;
+        }
+
+        strong {
+          min-width: 60px;
+          text-align: right;
         }
       `}</style>
     </div>
