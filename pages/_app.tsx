@@ -40,6 +40,27 @@ function MyApp({ Component, pageProps }: AppProps) {
         };
     }, []);
 
+    useEffect(() => {
+        // Check for required environment variables
+        const requiredEnvVars = [
+            'NEXT_PUBLIC_BACKEND_URL',
+            'NEXT_PUBLIC_WS_URL'
+        ];
+
+        const missingEnvVars = requiredEnvVars.filter(
+            (envVar) => !process.env[envVar]
+        );
+
+        if (missingEnvVars.length > 0) {
+            console.error(
+                `[ERROR] Missing required environment variables: ${missingEnvVars.join(', ')}`
+            );
+        } else {
+            console.log('[DEBUG] Backend URL:', process.env.NEXT_PUBLIC_BACKEND_URL);
+            console.log('[DEBUG] WebSocket URL:', process.env.NEXT_PUBLIC_WS_URL);
+        }
+    }, []);
+
     return (
         <AuthProvider>
             <Layout>
