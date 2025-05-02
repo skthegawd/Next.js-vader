@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getModelStatus, initializeWebSocket } from '../lib/api';
+import { ModelHealth } from '../types/model';
 
 interface ModelStatus {
   gptModel: string;
@@ -10,11 +11,12 @@ interface ModelStatus {
 }
 
 interface ModelStatusIndicatorProps {
+  status: ModelHealth['status'];
   onStatusChange?: (status: ModelStatus) => void;
 }
 
-export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ onStatusChange }) => {
-  const [status, setStatus] = useState<ModelStatus | null>(null);
+export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ status, onStatusChange }) => {
+  const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
   const [wsStatus, setWsStatus] = useState<'connected' | 'disconnected' | 'error'>('disconnected');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +26,7 @@ export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ onSt
       try {
         setError(null);
         const modelStatus = await getModelStatus();
-        setStatus(modelStatus);
+        setModelStatus(modelStatus);
         onStatusChange?.(modelStatus);
       } catch (error) {
         console.error('Failed to fetch model status:', error);
@@ -44,7 +46,7 @@ export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ onSt
     const cleanup = initializeWebSocket(
       (data) => {
         if (data.type === 'model_status') {
-          setStatus(data.status);
+          setModelStatus(data.status);
           onStatusChange?.(data.status);
         }
       },
@@ -62,148 +64,68 @@ export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ onSt
     };
   }, [onStatusChange]);
 
+  const getStatusConfig = () => {
+    switch (status) {
+      case 'healthy':
+        return {
+          color: 'bg-green-500',
+          textColor: 'text-green-700',
+          bgColor: 'bg-green-50',
+          label: 'Healthy',
+          icon: (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+          )
+        };
+      case 'degraded':
+        return {
+          color: 'bg-yellow-500',
+          textColor: 'text-yellow-700',
+          bgColor: 'bg-yellow-50',
+          label: 'Degraded',
+          icon: (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          )
+        };
+      case 'error':
+        return {
+          color: 'bg-red-500',
+          textColor: 'text-red-700',
+          bgColor: 'bg-red-50',
+          label: 'Error',
+          icon: (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+          )
+        };
+      default:
+        return {
+          color: 'bg-gray-500',
+          textColor: 'text-gray-700',
+          bgColor: 'bg-gray-50',
+          label: 'Unknown',
+          icon: (
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+            </svg>
+          )
+        };
+    }
+  };
+
+  const config = getStatusConfig();
+
   return (
-    <div className="model-status-indicator">
-      <div className="status-header">
-        <h3>Model Status</h3>
-        <div className={`status-indicator ${wsStatus}`} title={`WebSocket: ${wsStatus}`} />
-      </div>
-      
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
-
-      {isLoading ? (
-        <div className="loading-status">
-          <div className="loading-spinner" />
-          <span>Loading model status...</span>
-        </div>
-      ) : status ? (
-        <div className="status-details">
-          <div className="status-item">
-            <span>GPT Model:</span>
-            <strong>{status.gptModel || 'Not available'}</strong>
-          </div>
-          <div className="status-item">
-            <span>Voice Model:</span>
-            <strong>{status.voiceModel || 'Not available'}</strong>
-          </div>
-          <div className="status-item">
-            <span>Streaming:</span>
-            <div className="toggle-switch">
-              <input
-                type="checkbox"
-                checked={status.isStreaming}
-                onChange={() => {}} // Handled by parent
-                id="streaming-toggle"
-              />
-              <label className="toggle-slider" htmlFor="streaming-toggle" />
-            </div>
-          </div>
-          <div className="status-item">
-            <span>Temperature:</span>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={status.temperature}
-              onChange={() => {}} // Handled by parent
-              className="temperature-slider"
-            />
-            <strong>{status.temperature.toFixed(1)}</strong>
-          </div>
-          <div className="status-item">
-            <span>Max Tokens:</span>
-            <input
-              type="range"
-              min="100"
-              max="4000"
-              step="100"
-              value={status.maxTokens}
-              onChange={() => {}} // Handled by parent
-              className="tokens-slider"
-            />
-            <strong>{status.maxTokens}</strong>
-          </div>
-        </div>
-      ) : null}
-
-      <style jsx>{`
-        .model-status-indicator {
-          background: var(--surface-color);
-          border-radius: 8px;
-          padding: 1rem;
-          margin: 1rem 0;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .status-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 1rem;
-        }
-
-        .error-message {
-          color: var(--error-color);
-          padding: 0.5rem;
-          margin-bottom: 1rem;
-          border-radius: 4px;
-          background: rgba(255, 82, 82, 0.1);
-        }
-
-        .loading-status {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          padding: 1rem;
-          color: var(--text-color);
-          opacity: 0.7;
-        }
-
-        .loading-spinner {
-          width: 20px;
-          height: 20px;
-          border: 2px solid transparent;
-          border-top-color: var(--secondary-color);
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        .status-details {
-          display: grid;
-          gap: 0.5rem;
-        }
-
-        .status-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 0.5rem;
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 4px;
-        }
-
-        .temperature-slider,
-        .tokens-slider {
-          flex: 1;
-          margin: 0 1rem;
-        }
-
-        strong {
-          min-width: 60px;
-          text-align: right;
-        }
-      `}</style>
+    <div className={`inline-flex items-center px-3 py-1 rounded-full ${config.bgColor} ${config.textColor}`}>
+      <span className={`flex-shrink-0 w-2 h-2 rounded-full ${config.color} mr-2`} />
+      <span className="text-sm font-medium flex items-center">
+        {config.label}
+        <span className="ml-2">{config.icon}</span>
+      </span>
     </div>
   );
 }; 

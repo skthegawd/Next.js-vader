@@ -29,15 +29,14 @@ export interface IApi {
 }
 
 // API Implementation
-export class ApiClient implements IApi {
-  private static instance: ApiClient;
+class ApiClient implements IApi {
+  private static instance: ApiClient | null = null;
   private readonly axios;
-  private readonly baseUrl: string;
 
   private constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com';
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com';
     this.axios = axios.create({
-      baseURL: this.baseUrl,
+      baseURL: baseUrl,
       headers: {
         'Content-Type': 'application/json',
         'X-Client-Version': process.env.NEXT_PUBLIC_API_VERSION || 'v1',
@@ -142,5 +141,6 @@ export class ApiClient implements IApi {
   }
 }
 
-// Export singleton instance
-export const api = ApiClient.getInstance(); 
+// Export the singleton instance and the class
+export const api = ApiClient.getInstance();
+export { ApiClient }; 
