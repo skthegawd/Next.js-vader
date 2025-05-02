@@ -1,5 +1,17 @@
-import axios, { AxiosInstance } from 'axios';
+import axios from 'axios';
 import type { ApiConfig, ApiResponse, SessionData, ThemeData } from './types';
+
+const baseURL = process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com';
+
+const axiosInstance = axios.create({
+  baseURL,
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Client-Version': process.env.NEXT_PUBLIC_API_VERSION || 'v1',
+    'X-Platform': 'web',
+  },
+  withCredentials: true,
+});
 
 export class ApiError extends Error {
   constructor(
@@ -12,57 +24,41 @@ export class ApiError extends Error {
   }
 }
 
-export class ApiClient {
-  private axios: AxiosInstance;
-  private baseUrl: string;
-
-  constructor(config: ApiConfig) {
-    this.baseUrl = config.baseUrl;
-    this.axios = axios.create({
-      baseURL: config.baseUrl,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Client-Version': process.env.NEXT_PUBLIC_API_VERSION || 'v1',
-        ...config.headers,
-      },
-      withCredentials: true,
-    });
-
-    this.axios.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (error.response) {
-          throw new ApiError(
-            error.response.status,
-            error.response.data.message || 'An error occurred',
-            error.response.data.error
-          );
-        }
-        throw error;
-      }
-    );
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response) {
+      throw new ApiError(
+        error.response.status,
+        error.response.data.message || 'An error occurred',
+        error.response.data.error
+      );
+    }
+    throw error;
   }
+);
 
+export const api = {
   async initialize(): Promise<ApiResponse<SessionData>> {
-    const response = await this.axios.get('/api/next/init');
+    const response = await axiosInstance.get('/api/next/init');
     return response.data;
-  }
+  },
 
   async getTheme(): Promise<ApiResponse<ThemeData>> {
-    const response = await this.axios.get('/api/next/theme');
+    const response = await axiosInstance.get('/api/next/theme');
     return response.data;
-  }
+  },
 
   async analyzeCode(code: string): Promise<ApiResponse<any>> {
-    const response = await this.axios.post('/api/next/code/analyze', { code });
+    const response = await axiosInstance.post('/api/next/code/analyze', { code });
     return response.data;
-  }
+  },
 
   async streamChat(
     message: string,
     onChunk: (chunk: string) => void
   ): Promise<void> {
-    const response = await this.axios.post(
+    const response = await axiosInstance.post(
       '/api/next/chat/stream',
       { message },
       {
@@ -87,7 +83,7 @@ export class ApiClient {
         }
       }
     }
-  }
+  },
 
   async sendToAI(
     message: string,
@@ -102,36 +98,17 @@ export class ApiClient {
       return this.streamChat(message, options.onChunk || (() => {}));
     }
 
-    const response = await this.axios.post('/api/gpt', {
+    const response = await axiosInstance.post('/api/gpt', {
       query: message,
       temperature: options.temperature,
       max_tokens: options.maxTokens,
     });
 
     return response.data;
-  }
+  },
 
   async getModelStatus(): Promise<ApiResponse<any>> {
-    const response = await this.axios.get('/api/model-status');
+    const response = await axiosInstance.get('/api/model-status');
     return response.data;
-  }
-}
-
-// Module-level instance
-let apiInstance: ApiClient | undefined;
-
-// Function to get or create the API instance
-export function getApi(): ApiClient {
-  if (!apiInstance) {
-    apiInstance = new ApiClient({
-      baseUrl: process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com',
-      headers: {
-        'X-Platform': 'web',
-      },
-    });
-  }
-  return apiInstance;
-}
-
-// Export the instance getter as the default export
-export default getApi; 
+  },
+}; 
