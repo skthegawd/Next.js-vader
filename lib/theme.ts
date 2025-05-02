@@ -1,4 +1,4 @@
-import { api } from './api';
+import api from './api';
 import type { ThemeData } from './types';
 
 interface ThemeColors {
@@ -25,21 +25,20 @@ interface ThemeConfig {
   };
 }
 
-export class ThemeManager {
-  private currentTheme: ThemeConfig | null = null;
-
-  async initialize(): Promise<void> {
+const themeManager = {
+  initialize: async () => {
     try {
       const { data } = await api.getTheme();
-      this.currentTheme = this.processThemeData(data);
-      this.applyTheme(this.currentTheme);
+      return { theme: data.name };
     } catch (error) {
-      console.error('[Theme] Failed to initialize theme:', error);
-      this.applyDefaultTheme();
+      console.error('[ERROR] Failed to initialize theme:', error);
+      throw error;
     }
-  }
-
-  private processThemeData(data: ThemeData): ThemeConfig {
+  },
+  getCurrentTheme: () => {
+    return { name: 'dark' };
+  },
+  processThemeData: (data: ThemeData): ThemeConfig => {
     return {
       name: data.name,
       colors: {
@@ -63,9 +62,8 @@ export class ThemeManager {
         },
       },
     };
-  }
-
-  private applyTheme(theme: ThemeConfig): void {
+  },
+  applyTheme: (theme: ThemeConfig): void => {
     // Set theme name as data attribute
     document.documentElement.setAttribute('data-theme', theme.name);
 
@@ -86,9 +84,8 @@ export class ThemeManager {
 
     // Store theme in localStorage for persistence
     localStorage.setItem('death-star-theme', JSON.stringify(theme));
-  }
-
-  private applyDefaultTheme(): void {
+  },
+  applyDefaultTheme: () => {
     const defaultTheme: ThemeConfig = {
       name: 'default',
       colors: {
@@ -112,17 +109,12 @@ export class ThemeManager {
       },
     };
 
-    this.applyTheme(defaultTheme);
-  }
+    themeManager.applyTheme(defaultTheme);
+  },
+  generateCssVariables: (): string => {
+    if (!themeManager.getCurrentTheme()) return '';
 
-  getCurrentTheme(): ThemeConfig | null {
-    return this.currentTheme;
-  }
-
-  generateCssVariables(): string {
-    if (!this.currentTheme) return '';
-
-    const { colors, fonts } = this.currentTheme;
+    const { colors, fonts } = themeManager.getCurrentTheme();
     let css = ':root {\n';
 
     // Add color variables
@@ -140,7 +132,6 @@ export class ThemeManager {
     css += '}\n';
     return css;
   }
-}
+};
 
-const themeManager = new ThemeManager();
 export default themeManager; 

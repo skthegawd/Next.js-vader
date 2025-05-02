@@ -13,7 +13,7 @@ interface VoiceAssistantProps {
   initialMessage?: string;
 }
 
-export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ initialMessage }) => {
+const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ initialMessage }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState(initialMessage || '');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -276,4 +276,7 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ initialMessage }
       `}</style>
     </div>
   );
-}; 
+};
+
+export { VoiceAssistant };
+export default VoiceAssistant; 
