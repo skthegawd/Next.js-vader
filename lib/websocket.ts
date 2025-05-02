@@ -58,13 +58,15 @@ export class WebSocketManager {
       } else {
         url.protocol = 'ws:';
       }
+
+      // Remove any trailing slashes from the base URL
+      url.pathname = url.pathname.replace(/\/+$/, '');
       
       // Construct the proper path based on endpoint type
       if (this.endpoint === 'model-status') {
-        url.pathname = `/ws/model-status`;
-        url.searchParams.append('client_id', this.clientId);
+        url.pathname = `${url.pathname}/model-status/${this.clientId}`;
       } else {
-        url.pathname = `/ws/${this.clientId}`;
+        url.pathname = `${url.pathname}/terminal/${this.clientId}`;
       }
 
       // Add authentication token if available
@@ -72,6 +74,13 @@ export class WebSocketManager {
         url.searchParams.append('token', this.token);
       }
 
+      // Add API version if available
+      const apiVersion = process.env.NEXT_PUBLIC_API_VERSION;
+      if (apiVersion) {
+        url.searchParams.append('version', apiVersion);
+      }
+
+      console.debug(`[WebSocket ${this.endpoint}] Constructed URL:`, url.toString());
       return url.toString();
     } catch (error) {
       console.error('Error constructing WebSocket URL:', error);
@@ -112,12 +121,18 @@ export class WebSocketManager {
           reject(new Error('Connection timeout'));
         }, 10000); // 10 second timeout
 
-        this.ws!.onopen = () => {
+        if (!this.ws) {
+          clearTimeout(timeout);
+          reject(new Error('WebSocket not initialized'));
+          return;
+        }
+
+        this.ws.onopen = () => {
           clearTimeout(timeout);
           resolve();
         };
 
-        this.ws!.onerror = (error) => {
+        this.ws.onerror = (error) => {
           clearTimeout(timeout);
           reject(error);
         };
@@ -142,7 +157,11 @@ export class WebSocketManager {
 
       // Send initial subscription for model-status endpoint
       if (this.endpoint === 'model-status') {
-        this.ws?.send(JSON.stringify({ type: 'subscribe' }));
+        this.ws?.send(JSON.stringify({ 
+          type: 'subscribe',
+          client_id: this.clientId,
+          timestamp: new Date().toISOString()
+        }));
       }
     };
 
@@ -226,6 +245,7 @@ export class WebSocketManager {
       if (this.ws?.readyState === WebSocket.OPEN) {
         this.ws.send(JSON.stringify({ 
           type: 'ping',
+          client_id: this.clientId,
           timestamp: new Date().toISOString()
         }));
       }
@@ -254,7 +274,14 @@ export class WebSocketManager {
     if (this.endpoint !== 'terminal') {
       throw new Error('Cannot send commands on non-terminal WebSocket');
     }
-    this.ws.send(JSON.stringify({ command, args, watch }));
+    this.ws.send(JSON.stringify({ 
+      type: 'command',
+      command,
+      args,
+      watch,
+      client_id: this.clientId,
+      timestamp: new Date().toISOString()
+    }));
   }
 
   disconnect() {
