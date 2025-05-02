@@ -18,7 +18,7 @@ const nextConfig = {
             },
             {
                 source: '/ws',
-                destination: `${process.env.NEXT_PUBLIC_WS_URL}`,
+                destination: process.env.NEXT_PUBLIC_WS_URL || 'wss://vader-yp5n.onrender.com/ws',
             },
         ];
     },
