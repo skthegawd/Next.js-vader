@@ -29,18 +29,23 @@ export interface IApi {
 }
 
 // API Implementation
-class ApiImplementation implements IApi {
-  private axios = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Client-Version': process.env.NEXT_PUBLIC_API_VERSION || 'v1',
-      'X-Platform': 'web',
-    },
-    withCredentials: true,
-  });
+export class ApiClient implements IApi {
+  private static instance: ApiClient;
+  private readonly axios;
+  private readonly baseUrl: string;
 
-  constructor() {
+  private constructor() {
+    this.baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com';
+    this.axios = axios.create({
+      baseURL: this.baseUrl,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Client-Version': process.env.NEXT_PUBLIC_API_VERSION || 'v1',
+        'X-Platform': 'web',
+      },
+      withCredentials: true,
+    });
+
     this.axios.interceptors.response.use(
       (response) => response,
       (error) => {
@@ -54,6 +59,13 @@ class ApiImplementation implements IApi {
         throw error;
       }
     );
+  }
+
+  public static getInstance(): ApiClient {
+    if (!ApiClient.instance) {
+      ApiClient.instance = new ApiClient();
+    }
+    return ApiClient.instance;
   }
 
   async initialize(): Promise<ApiResponse<SessionData>> {
@@ -130,5 +142,5 @@ class ApiImplementation implements IApi {
   }
 }
 
-// Create and export the API instance
-export const api: IApi = new ApiImplementation(); 
+// Export singleton instance
+export const api = ApiClient.getInstance(); 
