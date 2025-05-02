@@ -2,6 +2,7 @@ import { ModelStatus } from '../types/model';
 
 interface WebSocketConfig {
   url: string;
+  token?: string;
   reconnectAttempts?: number;
   reconnectDelay?: number;
   onMessage?: (data: any) => void;
@@ -11,7 +12,7 @@ interface WebSocketConfig {
 type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 interface WebSocketMessage {
-  type: 'chat' | 'stream' | 'error' | 'heartbeat';
+  type: 'model_status' | 'error' | 'ping' | 'pong';
   data: any;
   timestamp: string;
 }
@@ -24,12 +25,26 @@ export class WebSocketManager {
   private onMessageCallback: ((data: ModelStatus) => void) | null = null;
   private onErrorCallback: ((error: Error) => void) | null = null;
   private pingInterval: NodeJS.Timeout | null = null;
+  private token: string | null = null;
 
-  constructor(private url: string) {}
+  constructor(private url: string) {
+    // Try to get token from localStorage or environment
+    this.token = localStorage.getItem('auth_token') || process.env.NEXT_PUBLIC_API_TOKEN || null;
+  }
+
+  setToken(token: string) {
+    this.token = token;
+    localStorage.setItem('auth_token', token);
+  }
 
   connect() {
     try {
-      this.ws = new WebSocket(this.url);
+      // Add token to URL if available
+      const wsUrl = this.token 
+        ? `${this.url}?token=${encodeURIComponent(this.token)}`
+        : this.url;
+
+      this.ws = new WebSocket(wsUrl);
       this.setupEventListeners();
     } catch (error) {
       console.error('WebSocket connection error:', error);
@@ -48,12 +63,28 @@ export class WebSocketManager {
 
     this.ws.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'pong') {
-          return; // Ignore pong messages
-        }
-        if (this.onMessageCallback) {
-          this.onMessageCallback(data);
+        const data = JSON.parse(event.data) as WebSocketMessage;
+        
+        switch (data.type) {
+          case 'pong':
+            // Handle pong response
+            break;
+          case 'error':
+            if (data.data?.auth === false) {
+              // Handle authentication error
+              console.error('WebSocket authentication failed');
+              this.disconnect();
+              return;
+            }
+            if (this.onErrorCallback) {
+              this.onErrorCallback(new Error(data.data.message || 'Unknown error'));
+            }
+            break;
+          case 'model_status':
+            if (this.onMessageCallback) {
+              this.onMessageCallback(data.data);
+            }
+            break;
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -67,10 +98,14 @@ export class WebSocketManager {
       }
     };
 
-    this.ws.onclose = () => {
-      console.log('WebSocket closed');
+    this.ws.onclose = (event) => {
+      console.log('WebSocket closed:', event.code, event.reason);
       this.stopPingInterval();
-      this.handleReconnect();
+      
+      // Don't reconnect if closed due to auth failure
+      if (event.code !== 1008) {
+        this.handleReconnect();
+      }
     };
   }
 
@@ -92,7 +127,7 @@ export class WebSocketManager {
   private startPingInterval() {
     this.pingInterval = setInterval(() => {
       if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send(JSON.stringify({ type: 'ping' }));
+        this.ws.send(JSON.stringify({ type: 'ping', timestamp: new Date().toISOString() }));
       }
     }, 30000); // Send ping every 30 seconds
   }
