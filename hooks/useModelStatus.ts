@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ModelStatus } from '../types/model';
-import ws from '../lib/websocket';
+import { modelStatusWs } from '../lib/websocket';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 const POLLING_INTERVAL = 30000; // 30 seconds
@@ -38,25 +38,27 @@ export const useModelStatus = () => {
     fetchModelStatus();
 
     // Setup WebSocket
-    ws.onMessage((data) => {
+    modelStatusWs.onMessage((data: ModelStatus) => {
       setModelStatus(data);
       setIsWebSocketConnected(true);
+      setError(null);
     });
 
-    ws.onError((error) => {
+    modelStatusWs.onError((error) => {
       console.error('WebSocket error:', error);
       setIsWebSocketConnected(false);
+      setError(error);
       // Start polling as fallback
       const cleanup = startPolling();
       return () => cleanup();
     });
 
     // Connect WebSocket
-    ws.connect();
+    modelStatusWs.connect();
 
     // Cleanup
     return () => {
-      ws.disconnect();
+      modelStatusWs.disconnect();
     };
   }, [startPolling]);
 
