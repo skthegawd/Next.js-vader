@@ -1,6 +1,6 @@
 import React from 'react';
 import Head from 'next/head';
-import { VoiceAssistant } from '@/components/VoiceAssistant';
+import { VoiceAssistant } from '../components/VoiceAssistant';
 
 export default function ChatPage() {
   return (

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ModelStatusIndicator } from './ModelStatusIndicator';
-import { sendToAI } from '@/lib/api';
+import { sendToAI } from '../lib/api';
 
 interface Message {
   text: string;

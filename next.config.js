@@ -63,6 +63,13 @@ const nextConfig = {
                 tls: false,
             };
         }
+
+        // Add module resolution aliases
+        config.resolve.alias = {
+            ...config.resolve.alias,
+            '@': '.',
+        };
+
         return config;
     },
 

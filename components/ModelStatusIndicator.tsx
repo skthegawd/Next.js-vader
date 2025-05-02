@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getModelStatus, initializeWebSocket } from '@/lib/api';
+import { getModelStatus, initializeWebSocket } from '../lib/api';
 
 interface ModelStatus {
   gptModel: string;
