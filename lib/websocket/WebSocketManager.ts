@@ -55,7 +55,7 @@ class WebSocketManager extends EventEmitter {
       throw new Error('WebSocket URL not configured. Please set NEXT_PUBLIC_WS_URL in your environment variables.');
     }
     const baseUrl = wsUrl.replace(/\/$/, '');
-    return `${baseUrl}/${this.endpoint}/${this.clientId}`;
+    return `${baseUrl}?endpoint=${encodeURIComponent(this.endpoint)}&client_id=${encodeURIComponent(this.clientId)}`;
   }
 
   public connect(options: WebSocketOptions = {}): void {
@@ -122,6 +122,12 @@ class WebSocketManager extends EventEmitter {
     console.error('[WebSocketManager] Error:', error);
     this.setStatus('error');
     this.emit('error', error);
+    
+    // Attempt to reconnect on error
+    if (this.ws) {
+      this.ws.close();
+      this.handleClose({ code: 1006, reason: 'Error occurred', wasClean: false } as CloseEvent);
+    }
   }
 
   private handleClose(event: CloseEvent): void {
@@ -129,9 +135,15 @@ class WebSocketManager extends EventEmitter {
     this.setStatus('disconnected');
     this.stopPingInterval();
 
+    // Don't reconnect if it was a clean close
+    if (event.wasClean) {
+      console.log('[WebSocketManager] Clean connection close, not attempting reconnect');
+      return;
+    }
+
     if (this.reconnectCount < this.reconnectAttempts) {
       const delay = Math.min(1000 * Math.pow(2, this.reconnectCount), 30000);
-      console.log(`[WebSocketManager] Attempting to reconnect in ${delay}ms...`);
+      console.log(`[WebSocketManager] Attempting to reconnect in ${delay}ms (attempt ${this.reconnectCount + 1}/${this.reconnectAttempts})`);
       
       this.reconnectTimeout = setTimeout(() => {
         this.reconnectCount++;
@@ -139,6 +151,7 @@ class WebSocketManager extends EventEmitter {
       }, delay);
     } else {
       console.log('[WebSocketManager] Max reconnection attempts reached');
+      this.emit('error', new Error('Max reconnection attempts reached'));
     }
   }
 

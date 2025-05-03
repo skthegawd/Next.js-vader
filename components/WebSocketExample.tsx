@@ -17,13 +17,36 @@ export const WebSocketExample = () => {
       console.log('[Chat] Received message:', data);
       if (data.type === 'connection_established') {
         console.log('[Chat] Connection established');
+        // Add connection message to chat
+        setMessages(prev => [...prev, {
+          type: 'system',
+          payload: { text: 'Connected to chat server' },
+          timestamp: new Date().toISOString()
+        }]);
+      } else if (data.type === 'error') {
+        console.error('[Chat] Server error:', data.payload);
       } else if (data.type !== 'pong') {
         setMessages(prev => [...prev, data]);
       }
     },
     onError: (err) => {
       console.error('[Chat] WebSocket error:', err);
+      // Add error message to chat
+      setMessages(prev => [...prev, {
+        type: 'system',
+        payload: { text: 'Connection error occurred. Attempting to reconnect...' },
+        timestamp: new Date().toISOString()
+      }]);
     },
+    onStatusChange: (newStatus) => {
+      if (newStatus === 'connected') {
+        console.log('[Chat] Connected to server');
+      } else if (newStatus === 'disconnected') {
+        console.log('[Chat] Disconnected from server');
+      }
+    },
+    reconnectAttempts: 5,
+    reconnectInterval: 3000
   });
 
   const handleSendMessage = () => {
