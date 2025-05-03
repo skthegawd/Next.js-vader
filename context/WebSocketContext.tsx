@@ -44,13 +44,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const connectModelStatus = async () => {
     try {
       if (!modelStatusWsRef.current) {
-        modelStatusWsRef.current = new WebSocketManager(wsUrl, 'model-status', {
-          autoReconnect: true,
-          reconnectInterval: 1000,
-          maxReconnectAttempts: 5,
-          pingInterval: 30000,
-          connectionTimeout: 10000
-        });
+        modelStatusWsRef.current = WebSocketManager.getInstance('model-status');
 
         modelStatusWsRef.current.onStatus((status) => {
           setModelStatusConnected(status === 'connected');
@@ -79,13 +73,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const connectTerminal = async () => {
     try {
       if (!terminalWsRef.current) {
-        terminalWsRef.current = new WebSocketManager(wsUrl, 'terminal', {
-          autoReconnect: true,
-          reconnectInterval: 1000,
-          maxReconnectAttempts: 5,
-          pingInterval: 30000,
-          connectionTimeout: 10000
-        });
+        terminalWsRef.current = WebSocketManager.getInstance('terminal');
 
         terminalWsRef.current.onStatus((status) => {
           setTerminalConnected(status === 'connected');

@@ -19,7 +19,7 @@ interface WebSocketOptions {
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 class WebSocketManager extends EventEmitter {
-  private static instance: WebSocketManager;
+  private static instances: Map<string, WebSocketManager> = new Map();
   private ws: WebSocket | null = null;
   private clientId: string;
   private endpoint: string;
@@ -30,19 +30,19 @@ class WebSocketManager extends EventEmitter {
   private status: ConnectionStatus = 'disconnected';
   private pingInterval: NodeJS.Timeout | null = null;
 
-  private constructor() {
+  private constructor(endpoint: string) {
     super();
     this.clientId = this.generateClientId();
-    this.endpoint = 'default';
+    this.endpoint = endpoint;
     this.reconnectAttempts = 5;
     this.reconnectInterval = 3000;
   }
 
-  public static getInstance(): WebSocketManager {
-    if (!WebSocketManager.instance) {
-      WebSocketManager.instance = new WebSocketManager();
+  public static getInstance(endpoint: string = 'default'): WebSocketManager {
+    if (!this.instances.has(endpoint)) {
+      this.instances.set(endpoint, new WebSocketManager(endpoint));
     }
-    return WebSocketManager.instance;
+    return this.instances.get(endpoint)!;
   }
 
   private generateClientId(): string {
@@ -61,7 +61,6 @@ class WebSocketManager extends EventEmitter {
   public connect(options: WebSocketOptions = {}): void {
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
-    this.endpoint = options.endpoint || 'default';
     this.reconnectAttempts = options.reconnectAttempts || 5;
     this.reconnectInterval = options.reconnectInterval || 3000;
 
