@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useWebSocket, WebSocketMessage } from '../hooks/useWebSocket';
+import { useWebSocket } from '../hooks/useWebSocket';
+import type { ConnectionStatus } from '../lib/websocket/WebSocketManager';
 
 // Generate a unique client ID
 const generateClientId = () => {
@@ -9,35 +10,26 @@ const generateClientId = () => {
 export const WebSocketExample = () => {
   const [messages, setMessages] = useState<any[]>([]);
   const [inputMessage, setInputMessage] = useState('');
-  const [clientId] = useState(generateClientId); // Generate once when component mounts
-  const [connectionStatus, setConnectionStatus] = useState<string>('connecting');
   
-  const { isConnected, error, sendMessage, reconnect } = useWebSocket({
-    clientId,
-    endpoint: 'chat', // Specify the endpoint
+  const { status, error, sendMessage, reconnect, getClientId } = useWebSocket({
+    endpoint: 'chat',
     onMessage: (data) => {
       console.log('[Chat] Received message:', data);
       if (data.type === 'connection_established') {
-        setConnectionStatus('connected');
-      } else if (data.type !== 'pong') { // Don't show pong messages in the UI
+        console.log('[Chat] Connection established');
+      } else if (data.type !== 'pong') {
         setMessages(prev => [...prev, data]);
       }
     },
     onError: (err) => {
       console.error('[Chat] WebSocket error:', err);
-      setConnectionStatus('error');
     },
   });
 
-  // Update connection status when isConnected changes
-  useEffect(() => {
-    setConnectionStatus(isConnected ? 'connected' : 'disconnected');
-  }, [isConnected]);
-
   const handleSendMessage = () => {
-    if (!inputMessage.trim() || !isConnected) return;
+    if (!inputMessage.trim() || status !== 'connected') return;
 
-    const message: WebSocketMessage = {
+    const message = {
       type: 'chat',
       payload: {
         text: inputMessage,
@@ -52,8 +44,8 @@ export const WebSocketExample = () => {
     }
   };
 
-  const getConnectionStatusColor = () => {
-    switch (connectionStatus) {
+  const getConnectionStatusColor = (status: ConnectionStatus) => {
+    switch (status) {
       case 'connected':
         return 'bg-green-500';
       case 'connecting':
@@ -69,11 +61,11 @@ export const WebSocketExample = () => {
     <div className="p-4">
       <div className="mb-4">
         <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${getConnectionStatusColor()}`} />
-          <span className="capitalize">{connectionStatus}</span>
-          {!isConnected && (
+          <div className={`w-3 h-3 rounded-full ${getConnectionStatusColor(status)}`} />
+          <span className="capitalize">{status}</span>
+          {status !== 'connected' && status !== 'connecting' && (
             <button
-              onClick={() => reconnect()}
+              onClick={reconnect}
               className="ml-2 px-2 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
             >
               Reconnect
@@ -86,7 +78,7 @@ export const WebSocketExample = () => {
           </div>
         )}
         <div className="text-sm text-gray-500 mt-1">
-          Client ID: {clientId}
+          Client ID: {getClientId()}
         </div>
       </div>
 
@@ -102,7 +94,7 @@ export const WebSocketExample = () => {
                 {new Date(msg.timestamp).toLocaleTimeString()}
               </div>
               <div className={`mt-1 p-3 rounded-lg ${
-                msg.client_id === clientId ? 'bg-blue-50 ml-8' : 'bg-gray-50 mr-8'
+                msg.client_id === getClientId() ? 'bg-blue-50 ml-8' : 'bg-gray-50 mr-8'
               }`}>
                 <pre className="whitespace-pre-wrap text-sm">
                   {JSON.stringify(msg.data || msg.payload, null, 2)}
@@ -119,15 +111,15 @@ export const WebSocketExample = () => {
           value={inputMessage}
           onChange={(e) => setInputMessage(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-          placeholder={isConnected ? "Type a message..." : "Connecting..."}
+          placeholder={status === 'connected' ? "Type a message..." : "Connecting..."}
           className="flex-1 px-4 py-2 border rounded-lg"
-          disabled={!isConnected}
+          disabled={status !== 'connected'}
         />
         <button
           onClick={handleSendMessage}
-          disabled={!isConnected || !inputMessage.trim()}
+          disabled={status !== 'connected' || !inputMessage.trim()}
           className={`px-4 py-2 rounded-lg ${
-            isConnected && inputMessage.trim()
+            status === 'connected' && inputMessage.trim()
               ? 'bg-blue-500 text-white hover:bg-blue-600'
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
