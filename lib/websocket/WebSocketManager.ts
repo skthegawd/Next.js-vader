@@ -70,7 +70,10 @@ class WebSocketManager extends EventEmitter {
   }
 
   public connect(options: WebSocketOptions = {}): void {
-    if (this.ws?.readyState === WebSocket.OPEN) return;
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      console.log('[WebSocketManager] Already connected, skipping connection attempt');
+      return;
+    }
 
     // Update configuration
     if (options.baseUrl) this.baseUrl = options.baseUrl;
@@ -80,8 +83,18 @@ class WebSocketManager extends EventEmitter {
 
     try {
       const wsUrl = this.getWebSocketUrl();
-      console.log('[WebSocketManager] Connecting to:', wsUrl);
+      console.log('[WebSocketManager] Connecting to:', wsUrl, {
+        endpoint: this.endpoint,
+        clientId: this.clientId,
+        hasToken: !!this.token
+      });
       
+      // Close existing connection if any
+      if (this.ws) {
+        this.ws.close();
+        this.ws = null;
+      }
+
       this.ws = new WebSocket(wsUrl);
       this.setStatus('connecting');
 
@@ -107,7 +120,8 @@ class WebSocketManager extends EventEmitter {
   }
 
   private handleOpen(): void {
-    console.log('[WebSocketManager] Connected successfully');
+    const wsUrl = this.getWebSocketUrl();
+    console.log(`[WebSocketManager] Connected successfully to ${wsUrl}`);
     this.setStatus('connected');
     this.reconnectCount = 0;
     this.startPingInterval();
@@ -118,7 +132,8 @@ class WebSocketManager extends EventEmitter {
       payload: {
         client_id: this.clientId,
         endpoint: this.endpoint,
-        token: this.token
+        token: this.token,
+        version: '1.0' // Add protocol version
       }
     });
   }
@@ -134,40 +149,45 @@ class WebSocketManager extends EventEmitter {
   }
 
   private handleError(error: Event): void {
-    console.error('[WebSocketManager] Error:', error);
+    const wsUrl = this.getWebSocketUrl();
+    const errorMessage = `[WebSocketManager] Error connecting to ${wsUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    console.error(errorMessage);
+    
+    const wsError = new Error(errorMessage);
     this.setStatus('error');
-    this.emit('error', error);
+    this.emit('error', wsError);
     
     // Attempt to reconnect on error
     if (this.ws) {
       this.ws.close();
-      this.handleClose({ code: 1006, reason: 'Error occurred', wasClean: false } as CloseEvent);
+      this.handleClose({ code: 1006, reason: errorMessage, wasClean: false } as CloseEvent);
     }
   }
 
   private handleClose(event: CloseEvent): void {
-    console.log('[WebSocketManager] Connection closed:', event.code, event.reason);
+    const closeReason = event.reason || 'No reason provided';
+    console.log(`[WebSocketManager] Connection closed: code=${event.code}, reason=${closeReason}`);
     this.setStatus('disconnected');
     this.stopPingInterval();
 
-    // Don't reconnect if it was a clean close
-    if (event.wasClean) {
-      console.log('[WebSocketManager] Clean connection close, not attempting reconnect');
+    // Don't reconnect if it was a clean close or max attempts reached
+    if (event.wasClean || this.reconnectCount >= this.reconnectAttempts) {
+      if (event.wasClean) {
+        console.log('[WebSocketManager] Clean connection close, not attempting reconnect');
+      } else {
+        console.log(`[WebSocketManager] Max reconnection attempts (${this.reconnectAttempts}) reached`);
+        this.emit('error', new Error(`Failed to connect after ${this.reconnectAttempts} attempts`));
+      }
       return;
     }
 
-    if (this.reconnectCount < this.reconnectAttempts) {
-      const delay = Math.min(1000 * Math.pow(2, this.reconnectCount), 30000);
-      console.log(`[WebSocketManager] Attempting to reconnect in ${delay}ms (attempt ${this.reconnectCount + 1}/${this.reconnectAttempts})`);
-      
-      this.reconnectTimeout = setTimeout(() => {
-        this.reconnectCount++;
-        this.connect();
-      }, delay);
-    } else {
-      console.log('[WebSocketManager] Max reconnection attempts reached');
-      this.emit('error', new Error('Max reconnection attempts reached'));
-    }
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectCount), 30000);
+    console.log(`[WebSocketManager] Attempting to reconnect in ${delay}ms (attempt ${this.reconnectCount + 1}/${this.reconnectAttempts})`);
+    
+    this.reconnectTimeout = setTimeout(() => {
+      this.reconnectCount++;
+      this.connect();
+    }, delay);
   }
 
   private startPingInterval(): void {
