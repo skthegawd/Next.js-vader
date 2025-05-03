@@ -55,7 +55,7 @@ class WebSocketManager extends EventEmitter {
       throw new Error('WebSocket URL not configured. Please set NEXT_PUBLIC_WS_URL in your environment variables.');
     }
     const baseUrl = wsUrl.replace(/\/$/, '');
-    return `${baseUrl}?endpoint=${encodeURIComponent(this.endpoint)}&client_id=${encodeURIComponent(this.clientId)}`;
+    return `${baseUrl}/ws/${encodeURIComponent(this.endpoint)}/${encodeURIComponent(this.clientId)}`;
   }
 
   public connect(options: WebSocketOptions = {}): void {
