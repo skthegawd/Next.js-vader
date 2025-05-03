@@ -59,7 +59,11 @@ class WebSocketManager extends EventEmitter {
       throw new Error('WebSocket URL not configured');
     }
     
-    const url = `${baseUrl}/ws/${encodeURIComponent(this.endpoint)}/${encodeURIComponent(this.clientId)}`;
+    // Ensure we have the /ws base path
+    const wsBasePath = baseUrl.endsWith('/ws') ? baseUrl : `${baseUrl}/ws`;
+    
+    // Construct the full URL with endpoint and client ID
+    const url = `${wsBasePath}/${encodeURIComponent(this.endpoint)}/${encodeURIComponent(this.clientId)}`;
     
     // Add token as a query parameter if provided
     if (this.token) {
