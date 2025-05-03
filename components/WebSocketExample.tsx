@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useWebSocket, WebSocketMessage } from '../hooks/useWebSocket';
 
+// Generate a unique client ID
+const generateClientId = () => {
+  return `client-${Math.random().toString(36).substring(2, 15)}-${Date.now()}`;
+};
+
 export const WebSocketExample = () => {
   const [messages, setMessages] = useState<any[]>([]);
   const [inputMessage, setInputMessage] = useState('');
+  const [clientId] = useState(generateClientId); // Generate once when component mounts
   
-  // Generate a unique client ID (in a real app, this might come from authentication)
-  const clientId = 'user-123'; // Replace with actual user ID or session ID
-
   const { isConnected, error, sendMessage } = useWebSocket({
     clientId,
     onMessage: (data) => {
+      console.log('Received message:', data);
       setMessages(prev => [...prev, data]);
     },
     onError: (err) => {
@@ -25,7 +29,6 @@ export const WebSocketExample = () => {
       type: 'chat',
       payload: {
         text: inputMessage,
-        timestamp: new Date().toISOString(),
       },
     };
 
@@ -45,6 +48,9 @@ export const WebSocketExample = () => {
             Error: Connection failed
           </div>
         )}
+        <div className="text-sm text-gray-500 mt-1">
+          Client ID: {clientId}
+        </div>
       </div>
 
       <div className="border rounded-lg p-4 h-[400px] mb-4 overflow-y-auto">

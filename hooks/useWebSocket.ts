@@ -30,14 +30,26 @@ export const useWebSocket = ({
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL}/${clientId}`;
-    const ws = new WebSocket(wsUrl);
+    // Construct WebSocket URL with query parameters
+    const wsUrl = new URL(process.env.NEXT_PUBLIC_WS_URL || '');
+    wsUrl.searchParams.append('client_id', clientId);
+    
+    const ws = new WebSocket(wsUrl.toString());
 
     ws.onopen = () => {
       console.log('WebSocket connected');
       setIsConnected(true);
       setError(null);
       reconnectCountRef.current = 0;
+      
+      // Send initial connection message
+      ws.send(JSON.stringify({
+        type: 'connect',
+        payload: {
+          client_id: clientId,
+          timestamp: new Date().toISOString()
+        }
+      }));
     };
 
     ws.onmessage = (event) => {
@@ -84,11 +96,15 @@ export const useWebSocket = ({
 
   const sendMessage = useCallback((message: WebSocketMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(message));
+      wsRef.current.send(JSON.stringify({
+        ...message,
+        client_id: clientId, // Always include client_id with messages
+        timestamp: new Date().toISOString()
+      }));
     } else {
       console.warn('WebSocket is not connected');
     }
-  }, []);
+  }, [clientId]);
 
   useEffect(() => {
     connect();
