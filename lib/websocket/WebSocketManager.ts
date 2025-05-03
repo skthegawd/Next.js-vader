@@ -8,9 +8,10 @@ export interface WebSocketMessage {
 }
 
 interface WebSocketOptions {
-  endpoint?: string;
+  token?: string;
+  baseUrl?: string;
   onMessage?: (data: any) => void;
-  onError?: (error: Event) => void;
+  onError?: (error: Error) => void;
   onStatusChange?: (status: ConnectionStatus) => void;
   reconnectAttempts?: number;
   reconnectInterval?: number;
@@ -23,6 +24,8 @@ class WebSocketManager extends EventEmitter {
   private ws: WebSocket | null = null;
   private clientId: string;
   private endpoint: string;
+  private token: string | null = null;
+  private baseUrl: string;
   private reconnectAttempts: number;
   private reconnectInterval: number;
   private reconnectCount: number = 0;
@@ -34,6 +37,7 @@ class WebSocketManager extends EventEmitter {
     super();
     this.clientId = this.generateClientId();
     this.endpoint = endpoint;
+    this.baseUrl = process.env.NEXT_PUBLIC_WS_URL || '';
     this.reconnectAttempts = 5;
     this.reconnectInterval = 3000;
   }
@@ -50,17 +54,27 @@ class WebSocketManager extends EventEmitter {
   }
 
   private getWebSocketUrl(): string {
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL;
-    if (!wsUrl) {
-      throw new Error('WebSocket URL not configured. Please set NEXT_PUBLIC_WS_URL in your environment variables.');
+    const baseUrl = (this.baseUrl || process.env.NEXT_PUBLIC_WS_URL || '').replace(/\/$/, '');
+    if (!baseUrl) {
+      throw new Error('WebSocket URL not configured');
     }
-    const baseUrl = wsUrl.replace(/\/$/, '');
-    return `${baseUrl}/ws/${encodeURIComponent(this.endpoint)}/${encodeURIComponent(this.clientId)}`;
+    
+    const url = `${baseUrl}/ws/${encodeURIComponent(this.endpoint)}/${encodeURIComponent(this.clientId)}`;
+    
+    // Add token as a query parameter if provided
+    if (this.token) {
+      return `${url}?token=${encodeURIComponent(this.token)}`;
+    }
+    
+    return url;
   }
 
   public connect(options: WebSocketOptions = {}): void {
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
+    // Update configuration
+    if (options.baseUrl) this.baseUrl = options.baseUrl;
+    if (options.token) this.token = options.token;
     this.reconnectAttempts = options.reconnectAttempts || 5;
     this.reconnectInterval = options.reconnectInterval || 3000;
 
@@ -80,9 +94,10 @@ class WebSocketManager extends EventEmitter {
       if (options.onError) this.on('error', options.onError);
       if (options.onStatusChange) this.on('statusChange', options.onStatusChange);
     } catch (err) {
-      console.error('[WebSocketManager] Connection error:', err);
+      const error = err instanceof Error ? err : new Error('Failed to connect');
+      console.error('[WebSocketManager] Connection error:', error);
       this.setStatus('error');
-      this.emit('error', err);
+      this.emit('error', error);
     }
   }
 
@@ -97,12 +112,13 @@ class WebSocketManager extends EventEmitter {
     this.reconnectCount = 0;
     this.startPingInterval();
 
-    // Send initial handshake
+    // Send initial handshake with authentication
     this.send({
       type: 'handshake',
       payload: {
         client_id: this.clientId,
-        endpoint: this.endpoint
+        endpoint: this.endpoint,
+        token: this.token
       }
     });
   }

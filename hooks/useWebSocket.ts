@@ -1,77 +1,119 @@
-import { useEffect, useState, useCallback } from 'react';
-import WebSocketManager, { WebSocketMessage, ConnectionStatus } from '../lib/websocket/WebSocketManager';
+import { useEffect, useRef, useState } from 'react';
+import { WebSocketManager } from '../lib/websocket';
+import type { ConnectionStatus } from '../lib/websocket/WebSocketManager';
 
-interface UseWebSocketOptions {
-  endpoint?: string;
-  onMessage?: (data: any) => void;
-  onError?: (error: Event) => void;
-  onStatusChange?: (status: ConnectionStatus) => void;
-  reconnectAttempts?: number;
-  reconnectInterval?: number;
+interface WebSocketConfig {
+  endpoint: string;
+  token?: string;
 }
 
-export const useWebSocket = (options: UseWebSocketOptions = {}) => {
+interface WebSocketOptions {
+  config: WebSocketConfig;
+  onMessage?: (message: any) => void;
+  onError?: (error: Error) => void;
+  onStatusChange?: (status: ConnectionStatus) => void;
+}
+
+interface WebSocketHookResult {
+  status: ConnectionStatus;
+  error: Error | null;
+  sendMessage: (message: any) => boolean;
+  reconnect: () => void;
+  disconnect: () => void;
+  getClientId: () => string;
+}
+
+export const useWebSocket = (
+  url: string,
+  options: WebSocketOptions
+): WebSocketHookResult => {
+  const wsRef = useRef<WebSocketManager | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
-  const [error, setError] = useState<Event | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const manager = WebSocketManager.getInstance();
+    const initializeWebSocket = () => {
+      if (!wsRef.current) {
+        wsRef.current = WebSocketManager.getInstance(options.config.endpoint);
 
-    const handleMessage = (data: any) => {
-      options.onMessage?.(data);
+        // Set up event handlers
+        wsRef.current.on('statusChange', (newStatus: ConnectionStatus) => {
+          setStatus(newStatus);
+          options.onStatusChange?.(newStatus);
+        });
+
+        wsRef.current.on('message', (message: any) => {
+          options.onMessage?.(message);
+        });
+
+        wsRef.current.on('error', (err: Error) => {
+          setError(err);
+          options.onError?.(err);
+        });
+
+        // Connect with the provided configuration
+        wsRef.current.connect({
+          token: options.config.token,
+          baseUrl: url
+        });
+      }
     };
 
-    const handleError = (err: Event) => {
-      setError(err);
-      options.onError?.(err);
-    };
+    initializeWebSocket();
 
-    const handleStatusChange = (newStatus: ConnectionStatus) => {
-      setStatus(newStatus);
-      options.onStatusChange?.(newStatus);
-    };
-
-    // Connect with options
-    manager.connect({
-      ...options,
-      onMessage: handleMessage,
-      onError: handleError,
-      onStatusChange: handleStatusChange,
-    });
-
-    // Cleanup
+    // Cleanup on unmount
     return () => {
-      manager.disconnect();
+      if (wsRef.current) {
+        wsRef.current.disconnect();
+        wsRef.current = null;
+      }
     };
-  }, [options]);
+  }, [url, options.config.endpoint, options.config.token]);
 
-  const sendMessage = useCallback((message: WebSocketMessage): boolean => {
-    const manager = WebSocketManager.getInstance();
-    return manager.send(message);
-  }, []);
+  const sendMessage = (message: any): boolean => {
+    if (!wsRef.current) {
+      console.warn('Cannot send message - WebSocket not initialized');
+      return false;
+    }
+    return wsRef.current.send(message);
+  };
 
-  const disconnect = useCallback(() => {
-    const manager = WebSocketManager.getInstance();
-    manager.disconnect();
-  }, []);
+  const reconnect = () => {
+    if (wsRef.current) {
+      wsRef.current.disconnect();
+    }
+    wsRef.current = null;
+    setError(null);
+    setStatus('connecting');
+    wsRef.current = WebSocketManager.getInstance(options.config.endpoint);
+    wsRef.current.connect({
+      token: options.config.token,
+      baseUrl: url
+    });
+  };
 
-  const reconnect = useCallback(() => {
-    const manager = WebSocketManager.getInstance();
-    manager.connect();
-  }, []);
+  const disconnect = () => {
+    if (wsRef.current) {
+      wsRef.current.disconnect();
+      wsRef.current = null;
+    }
+    setStatus('disconnected');
+    setError(null);
+  };
 
-  const getClientId = useCallback(() => {
-    const manager = WebSocketManager.getInstance();
-    return manager.getClientId();
-  }, []);
+  const getClientId = (): string => {
+    if (!wsRef.current) {
+      throw new Error('WebSocket not initialized');
+    }
+    return wsRef.current.getClientId();
+  };
 
   return {
     status,
     error,
     sendMessage,
-    disconnect,
     reconnect,
-    getClientId,
-    isConnected: status === 'connected'
+    disconnect,
+    getClientId
   };
 }; 
