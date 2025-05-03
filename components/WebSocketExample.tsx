@@ -13,9 +13,12 @@ export const WebSocketExample = () => {
   
   const { isConnected, error, sendMessage } = useWebSocket({
     clientId,
+    endpoint: 'chat', // Specify the endpoint
     onMessage: (data) => {
       console.log('Received message:', data);
-      setMessages(prev => [...prev, data]);
+      if (data.type !== 'pong') { // Don't show pong messages in the UI
+        setMessages(prev => [...prev, data]);
+      }
     },
     onError: (err) => {
       console.error('WebSocket error:', err);
@@ -56,7 +59,12 @@ export const WebSocketExample = () => {
       <div className="border rounded-lg p-4 h-[400px] mb-4 overflow-y-auto">
         {messages.map((msg, index) => (
           <div key={index} className="mb-2">
-            <pre className="whitespace-pre-wrap">{JSON.stringify(msg, null, 2)}</pre>
+            <div className="text-sm text-gray-500">
+              {new Date(msg.timestamp).toLocaleTimeString()}
+            </div>
+            <pre className="whitespace-pre-wrap bg-gray-50 p-2 rounded">
+              {JSON.stringify(msg.data || msg.payload, null, 2)}
+            </pre>
           </div>
         ))}
       </div>
