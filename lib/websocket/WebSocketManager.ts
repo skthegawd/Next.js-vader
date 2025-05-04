@@ -54,24 +54,41 @@ export class WebSocketManager extends EventEmitter {
   }
 
   private getWebSocketUrl(): string {
-    // Get base URL from instance or environment
-    let baseUrl = (this.baseUrl || process.env.NEXT_PUBLIC_WS_URL || '').trim();
-    if (!baseUrl) {
-      throw new Error('WebSocket URL not configured');
-    }
+    try {
+      // Get base URL from instance or environment
+      let baseUrl = (this.baseUrl || process.env.NEXT_PUBLIC_WS_URL || '').trim();
+      if (!baseUrl) {
+        throw new Error('WebSocket URL not configured');
+      }
 
-    // Remove trailing slashes and /ws if present
-    baseUrl = baseUrl.replace(/\/+$/, '').replace(/\/ws$/, '');
+      // Parse the URL to ensure proper formatting
+      const url = new URL(baseUrl);
+      
+      // Ensure proper protocol (ws/wss)
+      if (!url.protocol.startsWith('ws')) {
+        url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+      }
 
-    // Construct the full URL with query parameters
-    let url = `${baseUrl}/ws?endpoint=${encodeURIComponent(this.endpoint)}&client_id=${encodeURIComponent(this.clientId)}`;
-    
-    // Add token as a query parameter if provided
-    if (this.token) {
-      url += `&token=${encodeURIComponent(this.token)}`;
+      // Set the pathname to /ws if not already set
+      if (!url.pathname.endsWith('/ws')) {
+        url.pathname = '/ws';
+      }
+
+      // Add query parameters
+      const params = new URLSearchParams(url.search);
+      params.set('endpoint', this.endpoint);
+      params.set('client_id', this.clientId);
+      
+      if (this.token) {
+        params.set('token', this.token);
+      }
+
+      // Construct the final URL
+      return `${url.origin}${url.pathname}?${params.toString()}`;
+    } catch (error) {
+      console.error('[WebSocketManager] Error constructing WebSocket URL:', error);
+      throw error;
     }
-    
-    return url;
   }
 
   public connect(options: WebSocketOptions = {}): void {
@@ -82,8 +99,7 @@ export class WebSocketManager extends EventEmitter {
 
     // Update configuration
     if (options.baseUrl) {
-      // Ensure baseUrl is properly formatted
-      this.baseUrl = options.baseUrl.trim().replace(/\/+$/, '').replace(/\/ws$/, '');
+      this.baseUrl = options.baseUrl.trim();
     }
     if (options.token) this.token = options.token;
     this.reconnectAttempts = options.reconnectAttempts || 5;
@@ -94,26 +110,50 @@ export class WebSocketManager extends EventEmitter {
       console.log('[WebSocketManager] Connecting to:', wsUrl, {
         endpoint: this.endpoint,
         clientId: this.clientId,
-        hasToken: !!this.token
+        hasToken: !!this.token,
+        readyState: this.ws?.readyState
       });
       
       // Close existing connection if any
       if (this.ws) {
-        this.ws.close();
+        try {
+          this.ws.close();
+        } catch (err) {
+          console.warn('[WebSocketManager] Error closing existing connection:', err);
+        }
         this.ws = null;
       }
 
+      // Create new WebSocket connection
       this.ws = new WebSocket(wsUrl);
       this.setStatus('connecting');
 
+      // Set up event handlers
       this.ws.onopen = this.handleOpen.bind(this);
       this.ws.onmessage = this.handleMessage.bind(this);
       this.ws.onerror = this.handleError.bind(this);
       this.ws.onclose = this.handleClose.bind(this);
 
+      // Set up custom event handlers if provided
       if (options.onMessage) this.on('message', options.onMessage);
       if (options.onError) this.on('error', options.onError);
       if (options.onStatusChange) this.on('statusChange', options.onStatusChange);
+
+      // Set connection timeout
+      const connectionTimeout = setTimeout(() => {
+        if (this.ws?.readyState !== WebSocket.OPEN) {
+          console.error('[WebSocketManager] Connection timeout');
+          this.handleError(new Error('Connection timeout'));
+        }
+      }, 10000); // 10 second timeout
+
+      // Clear timeout on successful connection
+      this.once('statusChange', (status: ConnectionStatus) => {
+        if (status === 'connected') {
+          clearTimeout(connectionTimeout);
+        }
+      });
+
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to connect');
       console.error('[WebSocketManager] Connection error:', error);
@@ -156,25 +196,59 @@ export class WebSocketManager extends EventEmitter {
     }
   }
 
-  private handleError(error: Event): void {
+  private handleError(error: Event | Error): void {
     const wsUrl = this.getWebSocketUrl();
-    const errorMessage = `[WebSocketManager] Error connecting to ${wsUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`;
-    console.error(errorMessage);
+    let errorMessage: string;
+
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (error instanceof Event) {
+      errorMessage = error instanceof ErrorEvent ? error.message : 'Unknown WebSocket error';
+    } else {
+      errorMessage = 'Unknown error type';
+    }
+
+    const fullError = `[WebSocketManager] Error connecting to ${wsUrl}: ${errorMessage}`;
+    console.error(fullError, {
+      readyState: this.ws?.readyState,
+      endpoint: this.endpoint,
+      clientId: this.clientId,
+      hasToken: !!this.token,
+      reconnectCount: this.reconnectCount,
+      error
+    });
     
-    const wsError = new Error(errorMessage);
+    const wsError = new Error(fullError);
     this.setStatus('error');
     this.emit('error', wsError);
     
     // Attempt to reconnect on error
     if (this.ws) {
-      this.ws.close();
-      this.handleClose({ code: 1006, reason: errorMessage, wasClean: false } as CloseEvent);
+      try {
+        this.ws.close();
+      } catch (err) {
+        console.warn('[WebSocketManager] Error closing connection after error:', err);
+      }
+      this.handleClose({ 
+        code: 1006, 
+        reason: fullError, 
+        wasClean: false 
+      } as CloseEvent);
     }
   }
 
   private handleClose(event: CloseEvent): void {
     const closeReason = event.reason || 'No reason provided';
-    console.log(`[WebSocketManager] Connection closed: code=${event.code}, reason=${closeReason}`);
+    console.log(`[WebSocketManager] Connection closed:`, {
+      code: event.code,
+      reason: closeReason,
+      wasClean: event.wasClean,
+      endpoint: this.endpoint,
+      clientId: this.clientId,
+      reconnectCount: this.reconnectCount,
+      maxRetries: this.reconnectAttempts
+    });
+
     this.setStatus('disconnected');
     this.stopPingInterval();
 
@@ -189,6 +263,7 @@ export class WebSocketManager extends EventEmitter {
       return;
     }
 
+    // Exponential backoff for reconnection
     const delay = Math.min(1000 * Math.pow(2, this.reconnectCount), 30000);
     console.log(`[WebSocketManager] Attempting to reconnect in ${delay}ms (attempt ${this.reconnectCount + 1}/${this.reconnectAttempts})`);
     
