@@ -328,9 +328,5 @@ export class WebSocketManager {
   }
 }
 
-// Create and export default instances for both endpoints
-const baseUrl = process.env.NEXT_PUBLIC_WS_URL!;
-console.debug('[WebSocket] Initializing with base URL:', baseUrl);
-
-export const modelStatusWs = new WebSocketManager(baseUrl, 'model-status');
-export const terminalWs = new WebSocketManager(baseUrl, 'terminal'); 
+// Export the WebSocketManager class
+export default WebSocketManager; 

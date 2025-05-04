@@ -70,10 +70,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   };
 
   const disconnectModelStatus = () => {
-    modelStatusWsRef.current?.disconnect();
-    modelStatusWsRef.current = null;
-    setModelStatusConnected(false);
-    setModelStatusError(null);
+    if (modelStatusWsRef.current) {
+      modelStatusWsRef.current.disconnect();
+      modelStatusWsRef.current = null;
+      setModelStatusConnected(false);
+      setModelStatusError(null);
+    }
   };
 
   // Terminal WebSocket Methods
@@ -104,10 +106,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   };
 
   const disconnectTerminal = () => {
-    terminalWsRef.current?.disconnect();
-    terminalWsRef.current = null;
-    setTerminalConnected(false);
-    setTerminalError(null);
+    if (terminalWsRef.current) {
+      terminalWsRef.current.disconnect();
+      terminalWsRef.current = null;
+      setTerminalConnected(false);
+      setTerminalError(null);
+    }
   };
 
   // Auto-connect effect with API initialization
