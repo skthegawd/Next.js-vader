@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { WebSocketManager } from '../lib/websocket';
+import WebSocketManager from '../lib/websocket';
+import type { ConnectionStatus } from '../lib/websocket';
 import { WSMessage } from '../types/websocket';
 
 interface WebSocketContextValue {

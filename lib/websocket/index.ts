@@ -1,2 +1,4 @@
-export { default as WebSocketManager } from './WebSocketManager';
-export type { WebSocketMessage, ConnectionStatus } from './WebSocketManager'; 
+import { WebSocketManager } from './WebSocketManager';
+export { WebSocketManager };
+export type { WebSocketMessage, ConnectionStatus } from './WebSocketManager';
+export default WebSocketManager; 

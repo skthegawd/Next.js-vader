@@ -19,7 +19,7 @@ interface WebSocketOptions {
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
-class WebSocketManager extends EventEmitter {
+export class WebSocketManager extends EventEmitter {
   private static instances: Map<string, WebSocketManager> = new Map();
   private ws: WebSocket | null = null;
   private clientId: string;

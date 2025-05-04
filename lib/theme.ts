@@ -25,20 +25,75 @@ interface ThemeConfig {
   };
 }
 
-const themeManager = {
-  initialize: async () => {
+class ThemeManager {
+  private currentTheme: ThemeConfig | null = null;
+
+  constructor() {
+    this.currentTheme = this.loadThemeFromStorage() || this.getDefaultTheme();
+  }
+
+  private loadThemeFromStorage(): ThemeConfig | null {
+    if (typeof window === 'undefined') return null;
+    
+    const stored = localStorage.getItem('death-star-theme');
+    if (!stored) return null;
+    
     try {
-      const { data } = await api.getTheme();
-      return { theme: data.name };
+      return JSON.parse(stored);
     } catch (error) {
-      console.error('[ERROR] Failed to initialize theme:', error);
-      throw error;
+      console.error('[Theme] Failed to parse stored theme:', error);
+      return null;
     }
-  },
-  getCurrentTheme: () => {
-    return { name: 'dark' };
-  },
-  processThemeData: (data: ThemeData): ThemeConfig => {
+  }
+
+  private getDefaultTheme(): ThemeConfig {
+    return {
+      name: 'default',
+      colors: {
+        primary: '#FF0000',
+        secondary: '#000000',
+        background: '#1A1A1A',
+        text: '#FFFFFF',
+        accent: '#FFE81F',
+      },
+      fonts: {
+        primary: {
+          family: 'system-ui',
+          weight: 400,
+          size: '16px',
+        },
+        secondary: {
+          family: 'system-ui',
+          weight: 400,
+          size: '14px',
+        },
+      },
+    };
+  }
+
+  public async initialize(): Promise<{ theme: string }> {
+    try {
+      // Try to get theme from API
+      const { data } = await api.getTheme();
+      const theme = this.processThemeData(data);
+      this.currentTheme = theme;
+      this.applyTheme(theme);
+      return { theme: theme.name };
+    } catch (error) {
+      console.error('[Theme] Failed to initialize theme:', error);
+      // Fall back to default theme
+      const defaultTheme = this.getDefaultTheme();
+      this.currentTheme = defaultTheme;
+      this.applyTheme(defaultTheme);
+      return { theme: defaultTheme.name };
+    }
+  }
+
+  public getCurrentTheme(): ThemeConfig | null {
+    return this.currentTheme;
+  }
+
+  public processThemeData(data: ThemeData): ThemeConfig {
     return {
       name: data.name,
       colors: {
@@ -62,8 +117,11 @@ const themeManager = {
         },
       },
     };
-  },
-  applyTheme: (theme: ThemeConfig): void => {
+  }
+
+  public applyTheme(theme: ThemeConfig): void {
+    if (typeof window === 'undefined') return;
+
     // Set theme name as data attribute
     document.documentElement.setAttribute('data-theme', theme.name);
 
@@ -84,46 +142,20 @@ const themeManager = {
 
     // Store theme in localStorage for persistence
     localStorage.setItem('death-star-theme', JSON.stringify(theme));
-  },
-  applyDefaultTheme: () => {
-    const defaultTheme: ThemeConfig = {
-      name: 'default',
-      colors: {
-        primary: '#FF0000',
-        secondary: '#000000',
-        background: '#1A1A1A',
-        text: '#FFFFFF',
-        accent: '#FFE81F',
-      },
-      fonts: {
-        primary: {
-          family: 'system-ui',
-          weight: 400,
-          size: '16px',
-        },
-        secondary: {
-          family: 'system-ui',
-          weight: 400,
-          size: '14px',
-        },
-      },
-    };
+    this.currentTheme = theme;
+  }
 
-    themeManager.applyTheme(defaultTheme);
-  },
-  generateCssVariables: (): string => {
-    if (!themeManager.getCurrentTheme()) return '';
-
-    const { colors, fonts } = themeManager.getCurrentTheme();
+  public generateCssVariables(): string {
+    const theme = this.currentTheme || this.getDefaultTheme();
     let css = ':root {\n';
 
     // Add color variables
-    Object.entries(colors).forEach(([key, value]) => {
+    Object.entries(theme.colors).forEach(([key, value]) => {
       css += `  --death-star-${key}: ${value};\n`;
     });
 
     // Add font variables
-    Object.entries(fonts).forEach(([key, value]) => {
+    Object.entries(theme.fonts).forEach(([key, value]) => {
       css += `  --death-star-font-${key}: ${value.family};\n`;
       css += `  --death-star-font-${key}-weight: ${value.weight};\n`;
       css += `  --death-star-font-${key}-size: ${value.size};\n`;
@@ -132,6 +164,7 @@ const themeManager = {
     css += '}\n';
     return css;
   }
-};
+}
 
+const themeManager = new ThemeManager();
 export default themeManager; 
