@@ -55,36 +55,31 @@ export class WebSocketManager extends EventEmitter {
 
   private getWebSocketUrl(): string {
     try {
-      // Get base URL from instance or environment
-      let baseUrl = (this.baseUrl || process.env.NEXT_PUBLIC_WS_URL || '').trim();
+      // Get the WebSocket URL from environment
+      const baseUrl = process.env.NEXT_PUBLIC_WS_URL;
       if (!baseUrl) {
-        throw new Error('WebSocket URL not configured');
+        throw new Error('WebSocket URL not configured - NEXT_PUBLIC_WS_URL is missing');
       }
 
-      // Parse the URL to ensure proper formatting
-      const url = new URL(baseUrl);
+      const wsUrl = new URL(baseUrl);
       
-      // Ensure proper protocol (ws/wss)
-      if (!url.protocol.startsWith('ws')) {
-        url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+      // Ensure WebSocket protocol
+      if (!wsUrl.protocol.startsWith('ws')) {
+        wsUrl.protocol = 'wss:';
       }
-
-      // Set the pathname to /ws if not already set
-      if (!url.pathname.endsWith('/ws')) {
-        url.pathname = '/ws';
-      }
-
-      // Add query parameters
-      const params = new URLSearchParams(url.search);
-      params.set('endpoint', this.endpoint);
-      params.set('client_id', this.clientId);
       
-      if (this.token) {
-        params.set('token', this.token);
-      }
+      // Use /ws consistently as the path
+      wsUrl.pathname = '/ws';
 
-      // Construct the final URL
-      return `${url.origin}${url.pathname}?${params.toString()}`;
+      // Set query parameters
+      wsUrl.search = new URLSearchParams({
+        endpoint: this.endpoint,
+        client_id: this.clientId
+      }).toString();
+
+      const finalUrl = wsUrl.toString();
+      console.log('[WebSocketManager] Constructed URL:', finalUrl);
+      return finalUrl;
     } catch (error) {
       console.error('[WebSocketManager] Error constructing WebSocket URL:', error);
       throw error;
@@ -124,8 +119,21 @@ export class WebSocketManager extends EventEmitter {
         this.ws = null;
       }
 
+      // Create new WebSocket connection with proper headers
+      const headers = {
+        'Origin': window.location.origin,
+        'X-Client-ID': this.clientId,
+        'X-Endpoint': this.endpoint
+      };
+
       // Create new WebSocket connection
       this.ws = new WebSocket(wsUrl);
+      
+      // Add custom headers via protocol field
+      Object.entries(headers).forEach(([key, value]) => {
+        this.ws.setRequestHeader?.(key, value);
+      });
+
       this.setStatus('connecting');
 
       // Set up event handlers
