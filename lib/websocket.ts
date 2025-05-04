@@ -12,6 +12,7 @@ import { ModelStatus } from '../types/model';
 type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 export class WebSocketManager {
+  private static instances: Map<string, WebSocketManager> = new Map();
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts: number;
@@ -21,17 +22,16 @@ export class WebSocketManager {
   private onStatusCallback: ((status: WebSocketStatus) => void) | null = null;
   private pingInterval: NodeJS.Timeout | null = null;
   private token: string | null = null;
-  private clientId: string;
+  private clientId: string | null = null;
   private endpoint: 'model-status' | 'terminal';
   private isConnecting = false;
   private shouldReconnect = true;
   private connectionTimeout: number;
   private pingIntervalTime: number;
 
-  constructor(private baseUrl: string, endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>) {
-    this.token = localStorage.getItem('auth_token') || process.env.NEXT_PUBLIC_API_TOKEN || null;
+  private constructor(endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>) {
     this.endpoint = endpoint;
-    this.clientId = this.generateClientId();
+    this.token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     
     // Initialize configuration with defaults or provided values
     this.maxReconnectAttempts = config?.maxReconnectAttempts || 5;
@@ -40,28 +40,37 @@ export class WebSocketManager {
     this.pingIntervalTime = config?.pingInterval || 30000;
   }
 
-  private generateClientId(): string {
-    const prefix = this.endpoint === 'model-status' ? 'model' : 'terminal';
-    return `${prefix}_${Math.random().toString(36).substr(2, 9)}`;
+  public static getInstance(endpoint: 'model-status' | 'terminal'): WebSocketManager {
+    if (!WebSocketManager.instances.has(endpoint)) {
+      WebSocketManager.instances.set(endpoint, new WebSocketManager(endpoint));
+    }
+    return WebSocketManager.instances.get(endpoint)!;
+  }
+
+  public setClientId(clientId: string) {
+    this.clientId = clientId;
   }
 
   private getWebSocketUrl(): string {
+    if (!this.clientId) {
+      throw new Error('Client ID not set. Call setClientId() before connecting.');
+    }
+
     try {
-      const url = new URL(this.baseUrl);
-      
-      // Convert http(s) to ws(s)
-      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-      
-      // Clean up the base URL path
-      url.pathname = url.pathname.replace(/\/+$/, '');
-      
-      // Only add /ws if it's not already in the base URL
-      if (!url.pathname.includes('/ws')) {
-        url.pathname = `${url.pathname}/ws`;
+      const baseUrl = process.env.NEXT_PUBLIC_WS_URL;
+      if (!baseUrl) {
+        throw new Error('NEXT_PUBLIC_WS_URL environment variable is not set');
       }
+
+      const url = new URL(baseUrl);
+      url.protocol = url.protocol.replace('http', 'ws');
       
-      // Add endpoint and client ID
-      url.pathname = `${url.pathname}/${this.endpoint}/${this.clientId}`;
+      // Use the correct path format with query parameters
+      url.pathname = '/ws';
+      
+      // Add endpoint and client ID as query parameters
+      url.searchParams.append('endpoint', this.endpoint);
+      url.searchParams.append('client_id', this.clientId);
 
       // Add authentication token if available
       if (this.token) {

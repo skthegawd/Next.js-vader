@@ -1,17 +1,18 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import WebSocketManager from '../lib/websocket';
+import api from '../lib/api';
 import type { ConnectionStatus } from '../lib/websocket';
 import { WSMessage } from '../types/websocket';
 
 interface WebSocketContextValue {
   modelStatus: {
-    connect: () => Promise<void>;
+    connect: (clientId?: string) => Promise<void>;
     disconnect: () => void;
     isConnected: boolean;
     error: Error | null;
   };
   terminal: {
-    connect: () => Promise<void>;
+    connect: (clientId?: string) => Promise<void>;
     disconnect: () => void;
     isConnected: boolean;
     error: Error | null;
@@ -42,7 +43,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const terminalWsRef = useRef<WebSocketManager | null>(null);
 
   // Model Status WebSocket Methods
-  const connectModelStatus = async () => {
+  const connectModelStatus = async (clientId?: string) => {
     try {
       if (!modelStatusWsRef.current) {
         modelStatusWsRef.current = WebSocketManager.getInstance('model-status');
@@ -56,8 +57,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         });
       }
 
+      if (clientId) {
+        modelStatusWsRef.current.setClientId(clientId);
+      }
+
       await modelStatusWsRef.current.connect();
     } catch (error) {
+      console.error('[WebSocket] Model status connection error:', error);
       setModelStatusError(error as Error);
       throw error;
     }
@@ -71,7 +77,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   };
 
   // Terminal WebSocket Methods
-  const connectTerminal = async () => {
+  const connectTerminal = async (clientId?: string) => {
     try {
       if (!terminalWsRef.current) {
         terminalWsRef.current = WebSocketManager.getInstance('terminal');
@@ -85,8 +91,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         });
       }
 
+      if (clientId) {
+        terminalWsRef.current.setClientId(clientId);
+      }
+
       await terminalWsRef.current.connect();
     } catch (error) {
+      console.error('[WebSocket] Terminal connection error:', error);
       setTerminalError(error as Error);
       throw error;
     }
@@ -99,12 +110,24 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     setTerminalError(null);
   };
 
-  // Auto-connect effect
+  // Auto-connect effect with API initialization
   useEffect(() => {
-    if (autoConnect) {
-      connectModelStatus();
-      connectTerminal();
-    }
+    const initializeWebSockets = async () => {
+      if (!autoConnect) return;
+
+      try {
+        // Get client ID from API
+        const { data } = await api.initialize();
+        if (data.features.websocket && data.clientId) {
+          await connectModelStatus(data.clientId);
+          await connectTerminal(data.clientId);
+        }
+      } catch (error) {
+        console.error('[WebSocket] Initialization error:', error);
+      }
+    };
+
+    initializeWebSockets();
 
     return () => {
       disconnectModelStatus();
