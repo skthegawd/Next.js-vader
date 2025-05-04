@@ -63,12 +63,12 @@ export class WebSocketManager extends EventEmitter {
     // Remove trailing slashes and /ws if present
     baseUrl = baseUrl.replace(/\/+$/, '').replace(/\/ws$/, '');
 
-    // Construct the full URL with the correct path structure
-    const url = `${baseUrl}/ws/${encodeURIComponent(this.endpoint)}/${encodeURIComponent(this.clientId)}`;
+    // Construct the full URL with query parameters
+    let url = `${baseUrl}/ws?endpoint=${encodeURIComponent(this.endpoint)}&client_id=${encodeURIComponent(this.clientId)}`;
     
     // Add token as a query parameter if provided
     if (this.token) {
-      return `${url}?token=${encodeURIComponent(this.token)}`;
+      url += `&token=${encodeURIComponent(this.token)}`;
     }
     
     return url;
