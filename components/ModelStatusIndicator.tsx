@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getModelStatus, initializeWebSocket } from '../lib/api';
+import api from '../lib/api';
 import { ModelHealth } from '../types/model';
 
 interface ModelStatus {
@@ -25,7 +25,7 @@ export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ stat
     const fetchStatus = async () => {
       try {
         setError(null);
-        const modelStatus = await getModelStatus();
+        const modelStatus = await api.getModelStatus();
         setModelStatus(modelStatus);
         onStatusChange?.(modelStatus);
       } catch (error) {
@@ -43,7 +43,7 @@ export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ stat
     const intervalId = setInterval(fetchStatus, 30000); // Refresh every 30 seconds
 
     // Set up WebSocket
-    const cleanup = initializeWebSocket(
+    const cleanup = api.initializeWebSocket(
       (data) => {
         if (data.type === 'model_status') {
           setModelStatus(data.status);

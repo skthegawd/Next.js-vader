@@ -141,6 +141,8 @@ class ApiClient implements IApi {
   }
 }
 
-// Export the singleton instance and the class
-export const api = ApiClient.getInstance();
-export { ApiClient }; 
+// Create and export a single instance
+const apiInstance = ApiClient.getInstance();
+
+// Export as default
+export default apiInstance; 
