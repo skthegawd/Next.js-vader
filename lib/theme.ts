@@ -25,28 +25,11 @@ interface ThemeConfig {
   };
 }
 
-class ThemeManager {
-  private static instance: ThemeManager | null = null;
-  private currentTheme: ThemeConfig | null = null;
-  private token: string | null = null;
+// Create a theme manager instance
+const themeManager = {
+  currentTheme: null as ThemeConfig | null,
 
-  private constructor() {
-    if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('auth_token') || process.env.NEXT_PUBLIC_API_TOKEN || null;
-      this.currentTheme = this.loadThemeFromStorage() || this.getDefaultTheme();
-    } else {
-      this.currentTheme = this.getDefaultTheme();
-    }
-  }
-
-  public static getInstance(): ThemeManager {
-    if (!ThemeManager.instance) {
-      ThemeManager.instance = new ThemeManager();
-    }
-    return ThemeManager.instance;
-  }
-
-  private loadThemeFromStorage(): ThemeConfig | null {
+  loadThemeFromStorage(): ThemeConfig | null {
     if (typeof window === 'undefined') return null;
     
     const stored = localStorage.getItem('death-star-theme');
@@ -58,9 +41,9 @@ class ThemeManager {
       console.error('[Theme] Failed to parse stored theme:', error);
       return null;
     }
-  }
+  },
 
-  private getDefaultTheme(): ThemeConfig {
+  getDefaultTheme(): ThemeConfig {
     return {
       name: 'default',
       colors: {
@@ -83,9 +66,9 @@ class ThemeManager {
         },
       },
     };
-  }
+  },
 
-  public async initialize(): Promise<{ theme: string }> {
+  async initialize(): Promise<{ theme: string }> {
     try {
       const { data } = await api.getTheme();
       const theme = this.processThemeData(data);
@@ -99,13 +82,13 @@ class ThemeManager {
       this.applyTheme(defaultTheme);
       return { theme: defaultTheme.name };
     }
-  }
+  },
 
-  public getCurrentTheme(): ThemeConfig | null {
+  getCurrentTheme(): ThemeConfig | null {
     return this.currentTheme;
-  }
+  },
 
-  public processThemeData(data: ThemeData): ThemeConfig {
+  processThemeData(data: ThemeData): ThemeConfig {
     return {
       name: data.name,
       colors: {
@@ -129,9 +112,9 @@ class ThemeManager {
         },
       },
     };
-  }
+  },
 
-  public applyTheme(theme: ThemeConfig): void {
+  applyTheme(theme: ThemeConfig): void {
     if (typeof window === 'undefined') return;
 
     document.documentElement.setAttribute('data-theme', theme.name);
@@ -151,9 +134,9 @@ class ThemeManager {
 
     localStorage.setItem('death-star-theme', JSON.stringify(theme));
     this.currentTheme = theme;
-  }
+  },
 
-  public generateCssVariables(): string {
+  generateCssVariables(): string {
     const theme = this.currentTheme || this.getDefaultTheme();
     let css = ':root {\n';
 
@@ -170,6 +153,11 @@ class ThemeManager {
     css += '}\n';
     return css;
   }
+};
+
+// Initialize theme from storage
+if (typeof window !== 'undefined') {
+  themeManager.currentTheme = themeManager.loadThemeFromStorage() || themeManager.getDefaultTheme();
 }
 
-export default ThemeManager; 
+export default themeManager; 
