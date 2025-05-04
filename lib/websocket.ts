@@ -11,8 +11,7 @@ import { ModelStatus } from '../types/model';
 
 type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
-export class WebSocketManager {
-  private static instances: Map<string, WebSocketManager> = new Map();
+class WebSocketManager {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts: number;
@@ -29,7 +28,7 @@ export class WebSocketManager {
   private connectionTimeout: number;
   private pingIntervalTime: number;
 
-  private constructor(endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>) {
+  constructor(endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>) {
     this.endpoint = endpoint;
     this.token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     
@@ -38,13 +37,6 @@ export class WebSocketManager {
     this.reconnectTimeout = config?.reconnectInterval || 1000;
     this.connectionTimeout = config?.connectionTimeout || 10000;
     this.pingIntervalTime = config?.pingInterval || 30000;
-  }
-
-  public static getInstance(endpoint: 'model-status' | 'terminal'): WebSocketManager {
-    if (!WebSocketManager.instances.has(endpoint)) {
-      WebSocketManager.instances.set(endpoint, new WebSocketManager(endpoint));
-    }
-    return WebSocketManager.instances.get(endpoint)!;
   }
 
   public setClientId(clientId: string) {
@@ -328,5 +320,15 @@ export class WebSocketManager {
   }
 }
 
-// Export the WebSocketManager class
-export default WebSocketManager; 
+// Create a WebSocket manager factory
+const instances = new Map<string, WebSocketManager>();
+
+export function createWebSocketManager(endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>): WebSocketManager {
+  if (!instances.has(endpoint)) {
+    instances.set(endpoint, new WebSocketManager(endpoint, config));
+  }
+  return instances.get(endpoint)!;
+}
+
+export type { WebSocketStatus };
+export default createWebSocketManager; 
