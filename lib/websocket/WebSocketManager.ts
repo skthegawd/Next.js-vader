@@ -67,18 +67,12 @@ export class WebSocketManager extends EventEmitter {
       if (!wsUrl.protocol.startsWith('ws')) {
         wsUrl.protocol = 'wss:';
       }
-      
-      // Use /ws consistently as the path
-      wsUrl.pathname = '/ws';
 
-      // Set query parameters
-      wsUrl.search = new URLSearchParams({
-        endpoint: this.endpoint,
-        client_id: this.clientId
-      }).toString();
+      // Use root path for simpler connection
+      wsUrl.pathname = '/';
 
       const finalUrl = wsUrl.toString();
-      console.log('[WebSocketManager] Constructed URL:', finalUrl);
+      console.log('[WebSocketManager] Connecting to:', finalUrl);
       return finalUrl;
     } catch (error) {
       console.error('[WebSocketManager] Error constructing WebSocket URL:', error);
@@ -92,22 +86,8 @@ export class WebSocketManager extends EventEmitter {
       return;
     }
 
-    // Update configuration
-    if (options.baseUrl) {
-      this.baseUrl = options.baseUrl.trim();
-    }
-    if (options.token) this.token = options.token;
-    this.reconnectAttempts = options.reconnectAttempts || 5;
-    this.reconnectInterval = options.reconnectInterval || 3000;
-
     try {
       const wsUrl = this.getWebSocketUrl();
-      console.log('[WebSocketManager] Connecting to:', wsUrl, {
-        endpoint: this.endpoint,
-        clientId: this.clientId,
-        hasToken: !!this.token,
-        readyState: this.ws?.readyState
-      });
       
       // Close existing connection if any
       if (this.ws) {
@@ -119,48 +99,61 @@ export class WebSocketManager extends EventEmitter {
         this.ws = null;
       }
 
-      // Create new WebSocket connection with proper headers
-      const headers = {
-        'Origin': window.location.origin,
-        'X-Client-ID': this.clientId,
-        'X-Endpoint': this.endpoint
-      };
-
       // Create new WebSocket connection
+      console.log('[WebSocketManager] Attempting connection...');
       this.ws = new WebSocket(wsUrl);
-      
-      // Add custom headers via protocol field
-      Object.entries(headers).forEach(([key, value]) => {
-        this.ws.setRequestHeader?.(key, value);
-      });
-
       this.setStatus('connecting');
 
       // Set up event handlers
-      this.ws.onopen = this.handleOpen.bind(this);
-      this.ws.onmessage = this.handleMessage.bind(this);
-      this.ws.onerror = this.handleError.bind(this);
-      this.ws.onclose = this.handleClose.bind(this);
+      this.ws.onopen = () => {
+        console.log('[WebSocketManager] Connection established');
+        this.setStatus('connected');
+        this.reconnectCount = 0;
+        
+        // Send initial identification message
+        this.send({
+          type: 'identify',
+          client_id: this.clientId,
+          endpoint: this.endpoint
+        });
+      };
+
+      this.ws.onmessage = (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('[WebSocketManager] Received:', data);
+          this.emit('message', data);
+        } catch (err) {
+          console.error('[WebSocketManager] Failed to parse message:', err);
+        }
+      };
+
+      this.ws.onerror = (error: Event) => {
+        console.error('[WebSocketManager] Connection error:', error);
+        this.setStatus('error');
+        this.emit('error', new Error('WebSocket connection error'));
+      };
+
+      this.ws.onclose = (event: CloseEvent) => {
+        console.log('[WebSocketManager] Connection closed:', event);
+        this.setStatus('disconnected');
+        
+        // Attempt reconnection if not a clean close
+        if (!event.wasClean && this.reconnectCount < this.reconnectAttempts) {
+          const delay = Math.min(1000 * Math.pow(2, this.reconnectCount), 30000);
+          console.log(`[WebSocketManager] Attempting reconnect in ${delay}ms (${this.reconnectCount + 1}/${this.reconnectAttempts})`);
+          
+          setTimeout(() => {
+            this.reconnectCount++;
+            this.connect();
+          }, delay);
+        }
+      };
 
       // Set up custom event handlers if provided
       if (options.onMessage) this.on('message', options.onMessage);
       if (options.onError) this.on('error', options.onError);
       if (options.onStatusChange) this.on('statusChange', options.onStatusChange);
-
-      // Set connection timeout
-      const connectionTimeout = setTimeout(() => {
-        if (this.ws?.readyState !== WebSocket.OPEN) {
-          console.error('[WebSocketManager] Connection timeout');
-          this.handleError(new Error('Connection timeout'));
-        }
-      }, 10000); // 10 second timeout
-
-      // Clear timeout on successful connection
-      this.once('statusChange', (status: ConnectionStatus) => {
-        if (status === 'connected') {
-          clearTimeout(connectionTimeout);
-        }
-      });
 
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to connect');
