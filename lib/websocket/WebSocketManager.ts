@@ -54,16 +54,17 @@ class WebSocketManager extends EventEmitter {
   }
 
   private getWebSocketUrl(): string {
-    const baseUrl = (this.baseUrl || process.env.NEXT_PUBLIC_WS_URL || '').replace(/\/$/, '');
+    // Get base URL from instance or environment
+    let baseUrl = (this.baseUrl || process.env.NEXT_PUBLIC_WS_URL || '').trim();
     if (!baseUrl) {
       throw new Error('WebSocket URL not configured');
     }
-    
-    // Ensure we have the /ws base path
-    const wsBasePath = baseUrl.endsWith('/ws') ? baseUrl : `${baseUrl}/ws`;
-    
-    // Construct the full URL with endpoint and client ID
-    const url = `${wsBasePath}/${encodeURIComponent(this.endpoint)}/${encodeURIComponent(this.clientId)}`;
+
+    // Remove trailing slashes and /ws if present
+    baseUrl = baseUrl.replace(/\/+$/, '').replace(/\/ws$/, '');
+
+    // Construct the full URL with the correct path structure
+    const url = `${baseUrl}/ws/${encodeURIComponent(this.endpoint)}/${encodeURIComponent(this.clientId)}`;
     
     // Add token as a query parameter if provided
     if (this.token) {
@@ -80,7 +81,10 @@ class WebSocketManager extends EventEmitter {
     }
 
     // Update configuration
-    if (options.baseUrl) this.baseUrl = options.baseUrl;
+    if (options.baseUrl) {
+      // Ensure baseUrl is properly formatted
+      this.baseUrl = options.baseUrl.trim().replace(/\/+$/, '').replace(/\/ws$/, '');
+    }
     if (options.token) this.token = options.token;
     this.reconnectAttempts = options.reconnectAttempts || 5;
     this.reconnectInterval = options.reconnectInterval || 3000;
