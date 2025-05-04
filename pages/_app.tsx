@@ -6,7 +6,7 @@ import Layout from "../components/Layout";
 import { AuthProvider } from "../context/AuthContext";
 import api from '../lib/api';
 import ws from '../lib/websocket';
-import themeManager from '../lib/theme';
+import ThemeManager from '../lib/theme';
 import { WebSocketProvider } from '../context/WebSocketContext';
 
 function MyApp({ Component, pageProps }: AppProps) {
@@ -24,6 +24,7 @@ function MyApp({ Component, pageProps }: AppProps) {
                 }
 
                 // Initialize theme
+                const themeManager = ThemeManager.getInstance();
                 await themeManager.initialize();
 
                 // Log initialization success

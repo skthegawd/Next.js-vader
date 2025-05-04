@@ -49,11 +49,19 @@ export class WebSocketManager {
     try {
       const url = new URL(this.baseUrl);
       
+      // Convert http(s) to ws(s)
       url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+      
+      // Clean up the base URL path
       url.pathname = url.pathname.replace(/\/+$/, '');
       
-      // Construct the proper path based on endpoint type
-      url.pathname = `${url.pathname}/ws/${this.endpoint}/${this.clientId}`;
+      // Only add /ws if it's not already in the base URL
+      if (!url.pathname.includes('/ws')) {
+        url.pathname = `${url.pathname}/ws`;
+      }
+      
+      // Add endpoint and client ID
+      url.pathname = `${url.pathname}/${this.endpoint}/${this.clientId}`;
 
       // Add authentication token if available
       if (this.token) {
@@ -66,11 +74,12 @@ export class WebSocketManager {
         url.searchParams.append('version', apiVersion);
       }
 
-      console.debug(`[WebSocket ${this.endpoint}] Constructed URL:`, url.toString());
-      return url.toString();
+      const finalUrl = url.toString();
+      console.debug(`[WebSocket ${this.endpoint}] Connecting to:`, finalUrl);
+      return finalUrl;
     } catch (error) {
-      console.error('Error constructing WebSocket URL:', error);
-      throw error;
+      console.error(`[WebSocket ${this.endpoint}] Error constructing WebSocket URL:`, error);
+      throw new Error(`Failed to construct WebSocket URL: ${error.message}`);
     }
   }
 
@@ -129,7 +138,7 @@ export class WebSocketManager {
     if (!this.ws) return;
 
     this.ws.onopen = () => {
-      console.debug(`[WebSocket ${this.endpoint}] Connected`);
+      console.debug(`[WebSocket ${this.endpoint}] Connected successfully`);
       this.reconnectAttempts = 0;
       this.updateStatus('connected');
       this.startPingInterval();
@@ -145,13 +154,18 @@ export class WebSocketManager {
 
     this.ws.onmessage = this.handleMessage.bind(this);
 
-    this.ws.onerror = (error) => {
-      console.error(`[WebSocket ${this.endpoint}] Error:`, error);
-      this.handleError(error as Error);
+    this.ws.onerror = (event) => {
+      const errorMessage = event instanceof ErrorEvent ? event.message : 'Unknown WebSocket error';
+      console.error(`[WebSocket ${this.endpoint}] Connection error:`, errorMessage);
+      this.handleError(new Error(`WebSocket connection error: ${errorMessage}`));
     };
 
     this.ws.onclose = (event) => {
-      console.debug(`[WebSocket ${this.endpoint}] Closed:`, event.code, event.reason);
+      console.debug(`[WebSocket ${this.endpoint}] Connection closed:`, {
+        code: event.code,
+        reason: event.reason,
+        wasClean: event.wasClean
+      });
       this.updateStatus('disconnected');
       this.stopPingInterval();
       

@@ -26,10 +26,24 @@ interface ThemeConfig {
 }
 
 class ThemeManager {
+  private static instance: ThemeManager | null = null;
   private currentTheme: ThemeConfig | null = null;
+  private token: string | null = null;
 
-  constructor() {
-    this.currentTheme = this.loadThemeFromStorage() || this.getDefaultTheme();
+  private constructor() {
+    if (typeof window !== 'undefined') {
+      this.token = localStorage.getItem('auth_token') || process.env.NEXT_PUBLIC_API_TOKEN || null;
+      this.currentTheme = this.loadThemeFromStorage() || this.getDefaultTheme();
+    } else {
+      this.currentTheme = this.getDefaultTheme();
+    }
+  }
+
+  public static getInstance(): ThemeManager {
+    if (!ThemeManager.instance) {
+      ThemeManager.instance = new ThemeManager();
+    }
+    return ThemeManager.instance;
   }
 
   private loadThemeFromStorage(): ThemeConfig | null {
@@ -73,7 +87,6 @@ class ThemeManager {
 
   public async initialize(): Promise<{ theme: string }> {
     try {
-      // Try to get theme from API
       const { data } = await api.getTheme();
       const theme = this.processThemeData(data);
       this.currentTheme = theme;
@@ -81,7 +94,6 @@ class ThemeManager {
       return { theme: theme.name };
     } catch (error) {
       console.error('[Theme] Failed to initialize theme:', error);
-      // Fall back to default theme
       const defaultTheme = this.getDefaultTheme();
       this.currentTheme = defaultTheme;
       this.applyTheme(defaultTheme);
@@ -122,15 +134,12 @@ class ThemeManager {
   public applyTheme(theme: ThemeConfig): void {
     if (typeof window === 'undefined') return;
 
-    // Set theme name as data attribute
     document.documentElement.setAttribute('data-theme', theme.name);
 
-    // Apply colors as CSS variables
     Object.entries(theme.colors).forEach(([key, value]) => {
       document.documentElement.style.setProperty(`--death-star-${key}`, value);
     });
 
-    // Apply fonts
     document.documentElement.style.setProperty(
       '--death-star-font-primary',
       theme.fonts.primary.family
@@ -140,7 +149,6 @@ class ThemeManager {
       theme.fonts.secondary.family
     );
 
-    // Store theme in localStorage for persistence
     localStorage.setItem('death-star-theme', JSON.stringify(theme));
     this.currentTheme = theme;
   }
@@ -149,12 +157,10 @@ class ThemeManager {
     const theme = this.currentTheme || this.getDefaultTheme();
     let css = ':root {\n';
 
-    // Add color variables
     Object.entries(theme.colors).forEach(([key, value]) => {
       css += `  --death-star-${key}: ${value};\n`;
     });
 
-    // Add font variables
     Object.entries(theme.fonts).forEach(([key, value]) => {
       css += `  --death-star-font-${key}: ${value.family};\n`;
       css += `  --death-star-font-${key}-weight: ${value.weight};\n`;
@@ -166,5 +172,4 @@ class ThemeManager {
   }
 }
 
-const themeManager = new ThemeManager();
-export default themeManager; 
+export default ThemeManager; 
