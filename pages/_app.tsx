@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { AppProps } from 'next/app';
+import getConfig from 'next/config';
 import "../styles/globals.css";  // Global styles
 import Layout from "../components/Layout";
 import { AuthProvider } from "../context/AuthContext";
@@ -9,6 +10,8 @@ import themeManager from '../lib/theme';
 import { WebSocketProvider } from '../context/WebSocketContext';
 
 function MyApp({ Component, pageProps }: AppProps) {
+    const { publicRuntimeConfig } = getConfig();
+
     useEffect(() => {
         const initializeApp = async () => {
             try {
@@ -49,7 +52,7 @@ function MyApp({ Component, pageProps }: AppProps) {
         ];
 
         const missingEnvVars = requiredEnvVars.filter(
-            (envVar) => !process.env[envVar]
+            (envVar) => !publicRuntimeConfig[envVar]
         );
 
         if (missingEnvVars.length > 0) {
@@ -57,10 +60,10 @@ function MyApp({ Component, pageProps }: AppProps) {
                 `[ERROR] Missing required environment variables: ${missingEnvVars.join(', ')}`
             );
         } else {
-            console.log('[DEBUG] Backend URL:', process.env.NEXT_PUBLIC_BACKEND_URL);
-            console.log('[DEBUG] WebSocket URL:', process.env.NEXT_PUBLIC_WS_URL);
+            console.log('[DEBUG] Backend URL:', publicRuntimeConfig.NEXT_PUBLIC_BACKEND_URL);
+            console.log('[DEBUG] WebSocket URL:', publicRuntimeConfig.NEXT_PUBLIC_WS_URL);
         }
-    }, []);
+    }, [publicRuntimeConfig]);
 
     return (
         <WebSocketProvider>
