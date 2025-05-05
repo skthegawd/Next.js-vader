@@ -28,7 +28,7 @@ export interface IApi {
 
 class ApiClient implements IApi {
   private axios = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL,
+    baseURL: process.env.NEXT_PUBLIC_BACKEND_URL,
     headers: {
       'Content-Type': 'application/json',
       'X-Client-Version': process.env.NEXT_PUBLIC_API_VERSION || 'v1',
@@ -41,7 +41,12 @@ class ApiClient implements IApi {
   constructor() {
     this.axios.interceptors.request.use(
       (config) => {
+        if (config.url && !config.url.startsWith('/api/')) {
+          config.url = `/api${config.url}`;
+        }
+        
         console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, {
+          baseURL: config.baseURL,
           headers: config.headers,
           data: config.data
         });
@@ -66,6 +71,7 @@ class ApiClient implements IApi {
           message: error.message,
           stack: error.stack,
           url: error.config?.url,
+          baseURL: error.config?.baseURL,
           retryCount: error.config?.retryCount || 0
         });
 
