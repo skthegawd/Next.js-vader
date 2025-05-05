@@ -28,43 +28,76 @@ export interface IApi {
 
 class ApiClient implements IApi {
   private axios = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com',
+    baseURL: process.env.NEXT_PUBLIC_API_URL,
     headers: {
       'Content-Type': 'application/json',
       'X-Client-Version': process.env.NEXT_PUBLIC_API_VERSION || 'v1',
       'X-Platform': 'web',
     },
-    withCredentials: true,
+    timeout: 30000,
+    validateStatus: (status) => status >= 200 && status < 500,
   });
 
   constructor() {
-    this.axios.interceptors.response.use(
-      (response) => response,
+    this.axios.interceptors.request.use(
+      (config) => {
+        console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, {
+          headers: config.headers,
+          data: config.data
+        });
+        return config;
+      },
       (error) => {
-        if (error.response) {
+        console.error('[API] Request Error:', error);
+        return Promise.reject(error);
+      }
+    );
+
+    this.axios.interceptors.response.use(
+      (response) => {
+        console.log(`[API] Response ${response.status}:`, {
+          url: response.config.url,
+          data: response.data
+        });
+        return response;
+      },
+      (error) => {
+        console.error('[API] Full error details:', {
+          message: error.message,
+          stack: error.stack,
+          url: error.config?.url,
+          retryCount: error.config?.retryCount || 0
+        });
+
+        if (!error.response) {
           throw new ApiError(
-            error.response.status,
-            error.response.data.message || 'An error occurred',
-            error.response.data.error
+            0,
+            'Network error - please check your connection',
+            error
           );
         }
-        throw error;
+
+        throw new ApiError(
+          error.response.status,
+          error.response.data?.message || 'An unexpected error occurred',
+          error.response.data?.error || error
+        );
       }
     );
   }
 
   async initialize(): Promise<ApiResponse<SessionData>> {
-    const response = await this.axios.get('/api/next/init');
+    const response = await this.axios.get('/init');
     return response.data;
   }
 
   async getTheme(): Promise<ApiResponse<ThemeData>> {
-    const response = await this.axios.get('/api/next/theme');
+    const response = await this.axios.get('/theme');
     return response.data;
   }
 
   async analyzeCode(code: string): Promise<ApiResponse<any>> {
-    const response = await this.axios.post('/api/next/code/analyze', { code });
+    const response = await this.axios.post('/code/analyze', { code });
     return response.data;
   }
 
@@ -73,7 +106,7 @@ class ApiClient implements IApi {
     onChunk: (chunk: string) => void
   ): Promise<void> {
     const response = await this.axios.post(
-      '/api/next/chat/stream',
+      '/chat/stream',
       { message },
       {
         responseType: 'stream',
@@ -112,8 +145,8 @@ class ApiClient implements IApi {
       return this.streamChat(message, options.onChunk || (() => {}));
     }
 
-    const response = await this.axios.post('/api/gpt', {
-      query: message,
+    const response = await this.axios.post('/chat', {
+      message,
       temperature: options.temperature,
       max_tokens: options.maxTokens,
     });
@@ -122,7 +155,7 @@ class ApiClient implements IApi {
   }
 
   async getModelStatus(): Promise<ApiResponse<any>> {
-    const response = await this.axios.get('/api/model-status');
+    const response = await this.axios.get('/model-status');
     return response.data;
   }
 }
