@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { sendToAI } from '../lib/api';
+import { apiClient } from '../lib/api/client';
 import { tts_api_tts, stt_api_stt, wakeword_api_wakeword } from '../lib/voice';
 import ModelStatusIndicator from './ModelStatusIndicator';
 
@@ -59,11 +59,11 @@ export default function VoiceAssistant() {
         currentMessageRef.current = '';
 
         try {
-            console.log("[DEBUG] Sending request to GPT API...");
+            console.log("[DEBUG] Sending request to AI...");
             
             if (isStreaming) {
                 setMessages(prev => [...prev, '']);
-                await sendToAI(text, {
+                await apiClient.sendToAI(text, {
                     stream: true,
                     onChunk: (chunk) => {
                         currentMessageRef.current += chunk;
@@ -72,11 +72,14 @@ export default function VoiceAssistant() {
                             currentMessageRef.current
                         ]);
                     },
-                    ...modelParams
+                    temperature: modelParams.temperature,
+                    maxTokens: modelParams.maxTokens
                 });
             } else {
-                const response = await sendToAI(text, { ...modelParams });
-                console.log("[DEBUG] GPT API Response:", response);
+                const response = await apiClient.sendToAI(text, {
+                    temperature: modelParams.temperature,
+                    maxTokens: modelParams.maxTokens
+                });
 
                 if (response.error) {
                     throw new Error(response.error);
