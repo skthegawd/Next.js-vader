@@ -20,8 +20,13 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ initialMessage }) => {
   const [streamingEnabled, setStreamingEnabled] = useState(true);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [modelConfig, setModelConfig] = useState({
+    streaming_enabled: true,
     temperature: 0.7,
-    maxTokens: 150
+    max_tokens: 150,
+    models: {
+      chat: 'gpt-3.5-turbo',
+      voice: 'eleven-labs-v1'
+    }
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -111,11 +116,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ initialMessage }) => {
     <div className="voice-assistant">
       <ModelStatusIndicator
         onStatusChange={(status) => {
-          setStreamingEnabled(status.isStreaming);
-          setModelConfig({
-            temperature: status.temperature,
-            maxTokens: status.maxTokens
-          });
+          setModelConfig(status);
         }}
       />
 
@@ -123,8 +124,11 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ initialMessage }) => {
         <label>
           <input
             type="checkbox"
-            checked={streamingEnabled}
-            onChange={(e) => setStreamingEnabled(e.target.checked)}
+            checked={modelConfig.streaming_enabled}
+            onChange={(e) => setModelConfig(prev => ({
+              ...prev,
+              streaming_enabled: e.target.checked
+            }))}
           />
           Streaming
         </label>

@@ -323,6 +323,15 @@ class WebSocketManager {
 // Create a WebSocket manager factory
 const instances = new Map<string, WebSocketManager>();
 
+export function initializeWebSocket(endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>): WebSocketManager {
+  const manager = createWebSocketManager(endpoint, config);
+  manager.setClientId(`client-${Math.random().toString(36).substring(7)}`);
+  manager.connect().catch(error => {
+    console.error(`[WebSocket] Failed to initialize ${endpoint}:`, error);
+  });
+  return manager;
+}
+
 export function createWebSocketManager(endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>): WebSocketManager {
   if (!instances.has(endpoint)) {
     instances.set(endpoint, new WebSocketManager(endpoint, config));
@@ -330,5 +339,6 @@ export function createWebSocketManager(endpoint: 'model-status' | 'terminal', co
   return instances.get(endpoint)!;
 }
 
-export type { WebSocketStatus };
-export default createWebSocketManager; 
+export type { WebSocketStatus, WSConfig };
+export { WebSocketManager };
+export default initializeWebSocket; 
