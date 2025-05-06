@@ -4,7 +4,6 @@ import getConfig from 'next/config';
 import "../styles/globals.css";  // Global styles
 import Layout from "../components/Layout";
 import { AuthProvider } from "../context/AuthContext";
-import api from '../lib/api';
 import ThemeManager from '../lib/theme';
 import { WebSocketProvider } from '../context/WebSocketContext';
 import { ErrorBoundary } from '../components/ErrorBoundary';
@@ -15,41 +14,42 @@ function MyApp({ Component, pageProps }: AppProps) {
     useEffect(() => {
         const initializeApp = async () => {
             try {
+                // Check for required environment variables
+                const requiredEnvVars = [
+                    'NEXT_PUBLIC_BACKEND_URL',
+                    'NEXT_PUBLIC_WS_URL'
+                ];
+
+                const missingEnvVars = requiredEnvVars.filter(
+                    (envVar) => !publicRuntimeConfig[envVar]
+                );
+
+                if (missingEnvVars.length > 0) {
+                    throw new Error(
+                        `Missing required environment variables: ${missingEnvVars.join(', ')}`
+                    );
+                }
+
                 // Initialize theme
                 const themeManager = ThemeManager.getInstance();
-                await themeManager.initialize();
+                const { theme } = await themeManager.initialize();
 
                 // Log initialization success
                 console.log('[App] Initialization complete:', {
-                    theme: themeManager.getCurrentTheme()?.name
+                    theme,
+                    backendUrl: publicRuntimeConfig.NEXT_PUBLIC_BACKEND_URL,
+                    wsUrl: publicRuntimeConfig.NEXT_PUBLIC_WS_URL
                 });
             } catch (error) {
                 console.error('[App] Initialization failed:', error);
+                // Re-throw the error to be caught by the ErrorBoundary
+                throw error;
             }
         };
 
-        initializeApp();
-    }, []);
-
-    useEffect(() => {
-        // Check for required environment variables
-        const requiredEnvVars = [
-            'NEXT_PUBLIC_BACKEND_URL',
-            'NEXT_PUBLIC_WS_URL'
-        ];
-
-        const missingEnvVars = requiredEnvVars.filter(
-            (envVar) => !publicRuntimeConfig[envVar]
-        );
-
-        if (missingEnvVars.length > 0) {
-            console.error(
-                `[ERROR] Missing required environment variables: ${missingEnvVars.join(', ')}`
-            );
-        } else {
-            console.log('[DEBUG] Backend URL:', publicRuntimeConfig.NEXT_PUBLIC_BACKEND_URL);
-            console.log('[DEBUG] WebSocket URL:', publicRuntimeConfig.NEXT_PUBLIC_WS_URL);
-        }
+        initializeApp().catch(error => {
+            console.error('[App] Fatal initialization error:', error);
+        });
     }, [publicRuntimeConfig]);
 
     return (

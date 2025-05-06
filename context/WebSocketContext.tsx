@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import createWebSocketManager, { WebSocketStatus } from '../lib/websocket';
+import { WebSocketManager, WebSocketStatus } from '../lib/websocket';
 import api from '../lib/api';
 import { WSMessage } from '../types/websocket';
 
@@ -34,18 +34,18 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   // Model Status WebSocket State
   const [modelStatusConnected, setModelStatusConnected] = useState(false);
   const [modelStatusError, setModelStatusError] = useState<Error | null>(null);
-  const modelStatusWsRef = useRef<ReturnType<typeof createWebSocketManager> | null>(null);
+  const modelStatusWsRef = useRef<WebSocketManager | null>(null);
 
   // Terminal WebSocket State
   const [terminalConnected, setTerminalConnected] = useState(false);
   const [terminalError, setTerminalError] = useState<Error | null>(null);
-  const terminalWsRef = useRef<ReturnType<typeof createWebSocketManager> | null>(null);
+  const terminalWsRef = useRef<WebSocketManager | null>(null);
 
   // Model Status WebSocket Methods
   const connectModelStatus = async (clientId?: string) => {
     try {
       if (!modelStatusWsRef.current) {
-        modelStatusWsRef.current = createWebSocketManager('model-status');
+        modelStatusWsRef.current = WebSocketManager.getInstance('model-status');
 
         modelStatusWsRef.current.onStatus((status) => {
           setModelStatusConnected(status === 'connected');
@@ -81,7 +81,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const connectTerminal = async (clientId?: string) => {
     try {
       if (!terminalWsRef.current) {
-        terminalWsRef.current = createWebSocketManager('terminal');
+        terminalWsRef.current = WebSocketManager.getInstance('terminal');
 
         terminalWsRef.current.onStatus((status) => {
           setTerminalConnected(status === 'connected');

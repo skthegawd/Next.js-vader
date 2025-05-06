@@ -6,7 +6,9 @@ import {
   WSErrorMessage,
   WSConfig,
   MessageType,
-  ModelStatusData
+  ModelStatusData,
+  WebSocketError,
+  WebSocketErrorCode
 } from './types';
 
 export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
@@ -28,6 +30,7 @@ class WebSocketManager {
   private shouldReconnect = true;
   private connectionTimeout: number;
   private pingIntervalTime: number;
+  private readonly storageKey: string;
 
   private constructor(endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>) {
     if (typeof window === 'undefined') {
@@ -36,6 +39,7 @@ class WebSocketManager {
 
     this.endpoint = endpoint;
     this.token = localStorage.getItem('auth_token');
+    this.storageKey = `ws_${endpoint}_state`;
     
     // Initialize configuration with defaults or provided values
     this.maxReconnectAttempts = config?.maxReconnectAttempts || 5;
@@ -43,8 +47,53 @@ class WebSocketManager {
     this.connectionTimeout = config?.connectionTimeout || 10000;
     this.pingIntervalTime = config?.pingInterval || 30000;
 
+    // Restore connection state
+    this.restoreState();
+
     // Set default client ID if not provided
-    this.setClientId(`client-${Math.random().toString(36).substring(7)}`);
+    if (!this.clientId) {
+      this.setClientId(`client-${Math.random().toString(36).substring(7)}`);
+    }
+  }
+
+  private saveState() {
+    if (typeof window === 'undefined') return;
+
+    const state = {
+      clientId: this.clientId,
+      shouldReconnect: this.shouldReconnect,
+      lastConnected: new Date().toISOString()
+    };
+
+    try {
+      localStorage.setItem(this.storageKey, JSON.stringify(state));
+    } catch (error) {
+      console.error(`[WebSocket ${this.endpoint}] Failed to save state:`, error);
+    }
+  }
+
+  private restoreState() {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const savedState = localStorage.getItem(this.storageKey);
+      if (savedState) {
+        const state = JSON.parse(savedState);
+        this.clientId = state.clientId;
+        this.shouldReconnect = state.shouldReconnect;
+
+        // Check if last connection was recent (within 5 minutes)
+        const lastConnected = new Date(state.lastConnected);
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        if (lastConnected > fiveMinutesAgo) {
+          this.connect().catch(error => {
+            console.error(`[WebSocket ${this.endpoint}] Failed to reconnect:`, error);
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`[WebSocket ${this.endpoint}] Failed to restore state:`, error);
+    }
   }
 
   public static getInstance(endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>): WebSocketManager {
@@ -118,7 +167,7 @@ class WebSocketManager {
 
         case 'error':
           const errorMsg = message as WSErrorMessage;
-          this.handleError(new Error(errorMsg.error || 'Unknown error'));
+          this.handleError(new WebSocketError(errorMsg.error, errorMsg.code));
           break;
 
         case 'stream':
@@ -130,11 +179,17 @@ class WebSocketManager {
           break;
 
         default:
-          console.warn(`[WebSocket ${this.endpoint}] Unhandled message type:`, message.type);
+          this.handleError(new WebSocketError(
+            `Unhandled message type: ${message.type}`,
+            WebSocketErrorCode.INVALID_MESSAGE
+          ));
       }
     } catch (error) {
       console.error(`[WebSocket ${this.endpoint}] Error parsing message:`, error);
-      this.handleError(error as Error);
+      this.handleError(new WebSocketError(
+        'Failed to parse WebSocket message',
+        WebSocketErrorCode.INVALID_MESSAGE
+      ));
     }
   };
 
@@ -156,12 +211,12 @@ class WebSocketManager {
 
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
-          reject(new Error('Connection timeout'));
+          reject(new WebSocketError('Connection timeout', WebSocketErrorCode.CONNECTION_TIMEOUT));
         }, this.connectionTimeout);
 
         if (!this.ws) {
           clearTimeout(timeout);
-          reject(new Error('WebSocket not initialized'));
+          reject(new WebSocketError('WebSocket not initialized', WebSocketErrorCode.INITIALIZATION_ERROR));
           return;
         }
 
@@ -172,12 +227,15 @@ class WebSocketManager {
 
         this.ws.onerror = (error) => {
           clearTimeout(timeout);
-          reject(error);
+          reject(new WebSocketError(
+            error instanceof ErrorEvent ? error.message : 'Unknown WebSocket error',
+            WebSocketErrorCode.CONNECTION_FAILED
+          ));
         };
       });
     } catch (error) {
       console.error(`[WebSocket ${this.endpoint}] Connection error:`, error);
-      this.handleError(error as Error);
+      this.handleError(error instanceof Error ? error : new Error(String(error)));
       throw error;
     } finally {
       this.isConnecting = false;
@@ -199,7 +257,7 @@ class WebSocketManager {
     this.ws.onerror = (event) => {
       const errorMessage = event instanceof ErrorEvent ? event.message : 'Unknown WebSocket error';
       console.error(`[WebSocket ${this.endpoint}] Connection error:`, errorMessage);
-      this.handleError(new Error(`WebSocket connection error: ${errorMessage}`));
+      this.handleError(new WebSocketError(errorMessage, WebSocketErrorCode.CONNECTION_FAILED));
     };
 
     this.ws.onclose = (event) => {
@@ -228,13 +286,28 @@ class WebSocketManager {
     if (this.onStatusCallback) {
       this.onStatusCallback(status);
     }
+    if (status === 'connected') {
+      this.saveState();
+    }
   }
 
-  private handleError(error: Error) {
-    this.updateStatus('error');
+  private handleError(error: Error | WebSocketError) {
     if (this.onErrorCallback) {
+      if (!(error instanceof WebSocketError)) {
+        // Convert generic errors to WebSocketError
+        if (error.message.includes('timeout')) {
+          error = new WebSocketError(error.message, WebSocketErrorCode.CONNECTION_TIMEOUT);
+        } else if (error.message.includes('failed')) {
+          error = new WebSocketError(error.message, WebSocketErrorCode.CONNECTION_FAILED);
+        } else if (error.message.includes('network')) {
+          error = new WebSocketError(error.message, WebSocketErrorCode.NETWORK_ERROR);
+        } else {
+          error = new WebSocketError(error.message, WebSocketErrorCode.UNKNOWN_ERROR);
+        }
+      }
       this.onErrorCallback(error);
     }
+    this.updateStatus('error');
   }
 
   private async handleReconnect() {
@@ -284,11 +357,15 @@ class WebSocketManager {
 
   public disconnect() {
     this.shouldReconnect = false;
-    this.stopPingInterval();
+    this.saveState();
+    
     if (this.ws) {
-      this.ws.close(1000, 'Disconnected by client');
+      this.ws.close();
       this.ws = null;
     }
+    
+    this.stopPingInterval();
+    this.updateStatus('disconnected');
   }
 
   public static cleanup() {
@@ -299,9 +376,4 @@ class WebSocketManager {
   }
 }
 
-export const initializeWebSocket = (endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>): WebSocketManager => {
-  return WebSocketManager.getInstance(endpoint, config);
-};
-
-export { WebSocketManager };
-export default initializeWebSocket; 
+export default WebSocketManager; 
