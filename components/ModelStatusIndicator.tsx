@@ -1,124 +1,83 @@
 import React, { useEffect, useState } from 'react';
-import { WebSocketManager } from '../lib/websocket';
-import { ModelStatusData, WSModelStatusMessage } from '../types/websocket';
-import type { WebSocketStatus } from '../lib/websocket';
+import { useWebSocket } from '../context/WebSocketContext';
+import { WSMessage } from '../types/websocket';
 
-interface ModelStatusIndicatorProps {
-  onStatusChange?: (status: ModelStatusData) => void;
-}
-
-export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ onStatusChange }) => {
-  const [status, setStatus] = useState<WebSocketStatus>('disconnected');
-  const [modelStatus, setModelStatus] = useState<ModelStatusData>({
-    streaming_enabled: true,
-    temperature: 0.7,
-    max_tokens: 150,
-    models: {
-      chat: 'unknown',
-      voice: 'unknown'
-    }
-  });
+const ModelStatusIndicator: React.FC = () => {
+  const [status, setStatus] = useState('loading');
+  const { modelStatus } = useWebSocket();
 
   useEffect(() => {
-    // Get the WebSocket instance using the singleton pattern
-    const ws = WebSocketManager.getInstance('model-status');
+    if (!modelStatus.isConnected) return;
 
-    ws.onStatus((newStatus) => {
-      setStatus(newStatus);
-    });
-
-    ws.onMessage((data) => {
-      if (data.type === 'model_status') {
-        const statusMsg = data as WSModelStatusMessage;
-        setModelStatus(statusMsg.data);
-        onStatusChange?.(statusMsg.data);
+    const handleStatusUpdate = (message: WSMessage) => {
+      if (message.type === 'status') {
+        setStatus(message.data.status);
       }
+    };
+
+    modelStatus.onMessage?.(handleStatusUpdate);
+
+    // Request initial status
+    modelStatus.sendMessage?.({
+      type: 'command',
+      command: 'get_model_status',
+      timestamp: new Date().toISOString()
     });
 
-    // Cleanup on unmount
     return () => {
-      ws.disconnect();
+      modelStatus.offMessage?.(handleStatusUpdate);
     };
-  }, [onStatusChange]);
+  }, [modelStatus.isConnected]);
 
   return (
-    <div className="model-status">
-      <div className="status-row">
-        <div className={`status-indicator ${status}`} />
-        <span>Connection: {status}</span>
-      </div>
-      
-      <div className="model-info">
-        <div className="info-row">
-          <span>Streaming: {modelStatus.streaming_enabled ? 'Enabled' : 'Disabled'}</span>
-          <span>Temperature: {modelStatus.temperature.toFixed(1)}</span>
-        </div>
-        <div className="info-row">
-          <span>Max Tokens: {modelStatus.max_tokens}</span>
-          <span>Models: {modelStatus.models.chat} / {modelStatus.models.voice}</span>
-        </div>
-      </div>
+    <div className="status-indicator">
+      <span className={`status-dot ${status}`} />
+      <span className="status-text">{status}</span>
 
       <style jsx>{`
-        .model-status {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-          padding: 1rem;
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 8px;
-          font-size: 0.9rem;
-        }
-
-        .status-row {
+        .status-indicator {
           display: flex;
           align-items: center;
           gap: 0.5rem;
+          padding: 0.5rem;
+          border-radius: 4px;
+          background: rgba(255, 255, 255, 0.05);
         }
 
-        .model-info {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-          padding-top: 0.5rem;
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .info-row {
-          display: flex;
-          justify-content: space-between;
-          gap: 1rem;
-        }
-
-        .status-indicator {
-          width: 10px;
-          height: 10px;
+        .status-dot {
+          width: 8px;
+          height: 8px;
           border-radius: 50%;
         }
 
-        .connecting {
-          background: #ffd700;
-          animation: pulse 1s infinite;
+        .status-text {
+          font-size: 0.875rem;
+          color: var(--death-star-text);
+          text-transform: capitalize;
         }
 
-        .connected {
-          background: #4caf50;
+        .loading {
+          background: var(--death-star-secondary);
+          animation: pulse 1.5s infinite;
         }
 
-        .disconnected {
-          background: #f44336;
+        .ready {
+          background: var(--death-star-primary);
         }
 
         .error {
-          background: #ff9800;
+          background: #ff4444;
         }
 
         @keyframes pulse {
-          0% { opacity: 1; }
-          50% { opacity: 0.5; }
-          100% { opacity: 1; }
+          0% { opacity: 0.5; }
+          50% { opacity: 1; }
+          100% { opacity: 0.5; }
         }
       `}</style>
     </div>
   );
-}; 
+};
+
+export { ModelStatusIndicator };
+export default ModelStatusIndicator; 
