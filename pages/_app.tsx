@@ -7,6 +7,7 @@ import { AuthProvider } from "../context/AuthContext";
 import api from '../lib/api';
 import ThemeManager from '../lib/theme';
 import { WebSocketProvider } from '../context/WebSocketContext';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 function MyApp({ Component, pageProps }: AppProps) {
     const { publicRuntimeConfig } = getConfig();
@@ -52,13 +53,15 @@ function MyApp({ Component, pageProps }: AppProps) {
     }, [publicRuntimeConfig]);
 
     return (
-        <WebSocketProvider>
-            <AuthProvider>
-                <Layout>
-                    <Component {...pageProps} />
-                </Layout>
-            </AuthProvider>
-        </WebSocketProvider>
+        <ErrorBoundary>
+            <WebSocketProvider>
+                <AuthProvider>
+                    <Layout>
+                        <Component {...pageProps} />
+                    </Layout>
+                </AuthProvider>
+            </WebSocketProvider>
+        </ErrorBoundary>
     );
 }
 

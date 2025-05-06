@@ -5,13 +5,14 @@ import {
   WSStreamMessage, 
   WSErrorMessage,
   WSConfig,
-  MessageType
-} from '../types/websocket';
-import { ModelStatus } from '../types/model';
+  MessageType,
+  ModelStatusData
+} from './types';
 
-type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
+export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 class WebSocketManager {
+  private static instance: WebSocketManager | null = null;
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts: number;
@@ -28,24 +29,44 @@ class WebSocketManager {
   private connectionTimeout: number;
   private pingIntervalTime: number;
 
-  constructor(endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>) {
+  private constructor(endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>) {
+    if (typeof window === 'undefined') {
+      throw new Error('WebSocketManager cannot be instantiated on the server side');
+    }
+
     this.endpoint = endpoint;
-    this.token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    this.token = localStorage.getItem('auth_token');
     
     // Initialize configuration with defaults or provided values
     this.maxReconnectAttempts = config?.maxReconnectAttempts || 5;
     this.reconnectTimeout = config?.reconnectInterval || 1000;
     this.connectionTimeout = config?.connectionTimeout || 10000;
     this.pingIntervalTime = config?.pingInterval || 30000;
+
+    // Set default client ID if not provided
+    this.setClientId(`client-${Math.random().toString(36).substring(7)}`);
   }
 
-  public setClientId(clientId: string) {
-    this.clientId = clientId;
+  public static getInstance(endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>): WebSocketManager {
+    try {
+      if (!WebSocketManager.instance) {
+        WebSocketManager.instance = new WebSocketManager(endpoint, config);
+        
+        // Initialize connection
+        WebSocketManager.instance.connect().catch(error => {
+          console.error(`[WebSocket] Failed to initialize ${endpoint}:`, error);
+        });
+      }
+      return WebSocketManager.instance;
+    } catch (error) {
+      console.error('[WebSocket] Error creating instance:', error);
+      throw error;
+    }
   }
 
   private getWebSocketUrl(): string {
     if (!this.clientId) {
-      throw new Error('Client ID not set. Call setClientId() before connecting.');
+      throw new Error('Client ID not set');
     }
 
     try {
@@ -56,35 +77,32 @@ class WebSocketManager {
 
       const url = new URL(baseUrl);
       url.protocol = url.protocol.replace('http', 'ws');
-      
-      // Use the correct path format with query parameters
       url.pathname = '/ws';
       
-      // Add endpoint and client ID as query parameters
       url.searchParams.append('endpoint', this.endpoint);
       url.searchParams.append('client_id', this.clientId);
 
-      // Add authentication token if available
       if (this.token) {
         url.searchParams.append('token', this.token);
       }
 
-      // Add API version if available
       const apiVersion = process.env.NEXT_PUBLIC_API_VERSION;
       if (apiVersion) {
         url.searchParams.append('version', apiVersion);
       }
 
-      const finalUrl = url.toString();
-      console.debug(`[WebSocket ${this.endpoint}] Connecting to:`, finalUrl);
-      return finalUrl;
+      return url.toString();
     } catch (error) {
-      console.error(`[WebSocket ${this.endpoint}] Error constructing WebSocket URL:`, error);
-      throw new Error(`Failed to construct WebSocket URL: ${error.message}`);
+      console.error('[WebSocket] Error constructing URL:', error);
+      throw error;
     }
   }
 
-  private handleMessage(event: MessageEvent) {
+  public setClientId(clientId: string) {
+    this.clientId = clientId;
+  }
+
+  private handleMessage = (event: MessageEvent) => {
     try {
       const message = JSON.parse(event.data) as WSMessage;
       
@@ -104,16 +122,10 @@ class WebSocketManager {
           break;
 
         case 'stream':
-          const streamMsg = message as WSStreamMessage;
-          if (this.onMessageCallback) {
-            this.onMessageCallback(streamMsg.data);
-          }
-          break;
-
         case 'message':
         case 'response':
           if (this.onMessageCallback) {
-            this.onMessageCallback(message.data);
+            this.onMessageCallback(message);
           }
           break;
 
@@ -124,111 +136,9 @@ class WebSocketManager {
       console.error(`[WebSocket ${this.endpoint}] Error parsing message:`, error);
       this.handleError(error as Error);
     }
-  }
+  };
 
-  private handleStatusMessage(message: WSStatusMessage) {
-    const status = message.data.status;
-    this.updateStatus(status);
-    
-    if (status === 'error' && message.data.message) {
-      this.handleError(new Error(message.data.message));
-    }
-  }
-
-  private setupEventListeners() {
-    if (!this.ws) return;
-
-    this.ws.onopen = () => {
-      console.debug(`[WebSocket ${this.endpoint}] Connected successfully`);
-      this.reconnectAttempts = 0;
-      this.updateStatus('connected');
-      this.startPingInterval();
-
-      // Send initial subscription message
-      this.sendMessage({
-        type: 'status',
-        data: { status: 'connected' },
-        client_id: this.clientId,
-        timestamp: new Date().toISOString()
-      });
-    };
-
-    this.ws.onmessage = this.handleMessage.bind(this);
-
-    this.ws.onerror = (event) => {
-      const errorMessage = event instanceof ErrorEvent ? event.message : 'Unknown WebSocket error';
-      console.error(`[WebSocket ${this.endpoint}] Connection error:`, errorMessage);
-      this.handleError(new Error(`WebSocket connection error: ${errorMessage}`));
-    };
-
-    this.ws.onclose = (event) => {
-      console.debug(`[WebSocket ${this.endpoint}] Connection closed:`, {
-        code: event.code,
-        reason: event.reason,
-        wasClean: event.wasClean
-      });
-      this.updateStatus('disconnected');
-      this.stopPingInterval();
-      
-      if (this.shouldReconnect && event.code !== 1000 && event.code !== 1008) {
-        this.handleReconnect();
-      }
-    };
-  }
-
-  private sendMessage(message: WSMessage) {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(message));
-    } else {
-      console.warn(`[WebSocket ${this.endpoint}] Cannot send message - connection not open`);
-    }
-  }
-
-  async sendCommand(command: string, args: string[] = [], watch = false) {
-    const message: WSCommandMessage = {
-      type: 'command',
-      command,
-      args,
-      watch,
-      client_id: this.clientId,
-      timestamp: new Date().toISOString(),
-      data: null
-    };
-
-    this.sendMessage(message);
-  }
-
-  private startPingInterval() {
-    this.stopPingInterval();
-    this.pingInterval = setInterval(() => {
-      this.sendMessage({
-        type: 'ping',
-        data: null,
-        client_id: this.clientId,
-        timestamp: new Date().toISOString()
-      });
-    }, this.pingIntervalTime);
-  }
-
-  private stopPingInterval() {
-    if (this.pingInterval) {
-      clearInterval(this.pingInterval);
-      this.pingInterval = null;
-    }
-  }
-
-  onStatus(callback: (status: WebSocketStatus) => void) {
-    this.onStatusCallback = callback;
-  }
-
-  private updateStatus(status: WebSocketStatus) {
-    if (this.onStatusCallback) {
-      this.onStatusCallback(status);
-    }
-    console.debug(`[WebSocket ${this.endpoint}] Status: ${status}`);
-  }
-
-  async connect(): Promise<void> {
+  public async connect(): Promise<void> {
     if (this.isConnecting || (this.ws?.readyState === WebSocket.OPEN)) {
       return;
     }
@@ -244,7 +154,6 @@ class WebSocketManager {
       this.ws = new WebSocket(wsUrl);
       this.setupEventListeners();
 
-      // Wait for connection or error
       await new Promise<void>((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error('Connection timeout'));
@@ -275,6 +184,52 @@ class WebSocketManager {
     }
   }
 
+  private setupEventListeners() {
+    if (!this.ws) return;
+
+    this.ws.onopen = () => {
+      console.debug(`[WebSocket ${this.endpoint}] Connected successfully`);
+      this.reconnectAttempts = 0;
+      this.updateStatus('connected');
+      this.startPingInterval();
+    };
+
+    this.ws.onmessage = this.handleMessage;
+
+    this.ws.onerror = (event) => {
+      const errorMessage = event instanceof ErrorEvent ? event.message : 'Unknown WebSocket error';
+      console.error(`[WebSocket ${this.endpoint}] Connection error:`, errorMessage);
+      this.handleError(new Error(`WebSocket connection error: ${errorMessage}`));
+    };
+
+    this.ws.onclose = (event) => {
+      this.updateStatus('disconnected');
+      this.stopPingInterval();
+      
+      if (this.shouldReconnect && event.code !== 1000) {
+        this.handleReconnect();
+      }
+    };
+  }
+
+  public onStatus(callback: (status: WebSocketStatus) => void) {
+    this.onStatusCallback = callback;
+  }
+
+  public onMessage(callback: (data: any) => void) {
+    this.onMessageCallback = callback;
+  }
+
+  public onError(callback: (error: Error) => void) {
+    this.onErrorCallback = callback;
+  }
+
+  private updateStatus(status: WebSocketStatus) {
+    if (this.onStatusCallback) {
+      this.onStatusCallback(status);
+    }
+  }
+
   private handleError(error: Error) {
     this.updateStatus('error');
     if (this.onErrorCallback) {
@@ -283,15 +238,13 @@ class WebSocketManager {
   }
 
   private async handleReconnect() {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts || !this.shouldReconnect) {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error(`[WebSocket ${this.endpoint}] Max reconnection attempts reached`);
       return;
     }
 
     this.reconnectAttempts++;
     const delay = Math.min(this.reconnectTimeout * Math.pow(2, this.reconnectAttempts), 30000);
-    
-    console.debug(`[WebSocket ${this.endpoint}] Reconnecting in ${delay}ms (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
     
     await new Promise(resolve => setTimeout(resolve, delay));
     
@@ -302,15 +255,34 @@ class WebSocketManager {
     }
   }
 
-  onMessage(callback: (data: any) => void) {
-    this.onMessageCallback = callback;
+  private startPingInterval() {
+    this.stopPingInterval();
+    this.pingInterval = setInterval(() => {
+      this.sendMessage({
+        type: 'ping',
+        data: null,
+        client_id: this.clientId,
+        timestamp: new Date().toISOString()
+      });
+    }, this.pingIntervalTime);
   }
 
-  onError(callback: (error: Error) => void) {
-    this.onErrorCallback = callback;
+  private stopPingInterval() {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
   }
 
-  disconnect() {
+  private sendMessage(message: WSMessage) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+    } else {
+      console.warn(`[WebSocket ${this.endpoint}] Cannot send message - connection not open`);
+    }
+  }
+
+  public disconnect() {
     this.shouldReconnect = false;
     this.stopPingInterval();
     if (this.ws) {
@@ -318,27 +290,18 @@ class WebSocketManager {
       this.ws = null;
     }
   }
-}
 
-// Create a WebSocket manager factory
-const instances = new Map<string, WebSocketManager>();
-
-export function initializeWebSocket(endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>): WebSocketManager {
-  const manager = createWebSocketManager(endpoint, config);
-  manager.setClientId(`client-${Math.random().toString(36).substring(7)}`);
-  manager.connect().catch(error => {
-    console.error(`[WebSocket] Failed to initialize ${endpoint}:`, error);
-  });
-  return manager;
-}
-
-export function createWebSocketManager(endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>): WebSocketManager {
-  if (!instances.has(endpoint)) {
-    instances.set(endpoint, new WebSocketManager(endpoint, config));
+  public static cleanup() {
+    if (WebSocketManager.instance) {
+      WebSocketManager.instance.disconnect();
+      WebSocketManager.instance = null;
+    }
   }
-  return instances.get(endpoint)!;
 }
 
-export type { WebSocketStatus, WSConfig };
+export const initializeWebSocket = (endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>): WebSocketManager => {
+  return WebSocketManager.getInstance(endpoint, config);
+};
+
 export { WebSocketManager };
 export default initializeWebSocket; 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import initializeWebSocket, { WebSocketStatus } from '../lib/websocket';
+import { WebSocketManager } from '../lib/websocket';
 import { ModelStatusData, WSModelStatusMessage } from '../types/websocket';
+import type { WebSocketStatus } from '../lib/websocket';
 
 interface ModelStatusIndicatorProps {
   onStatusChange?: (status: ModelStatusData) => void;
@@ -19,7 +20,8 @@ export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ onSt
   });
 
   useEffect(() => {
-    const ws = initializeWebSocket('model-status');
+    // Get the WebSocket instance using the singleton pattern
+    const ws = WebSocketManager.getInstance('model-status');
 
     ws.onStatus((newStatus) => {
       setStatus(newStatus);
@@ -33,6 +35,7 @@ export const ModelStatusIndicator: React.FC<ModelStatusIndicatorProps> = ({ onSt
       }
     });
 
+    // Cleanup on unmount
     return () => {
       ws.disconnect();
     };
