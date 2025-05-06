@@ -5,7 +5,7 @@ import { Config } from '../lib/config';
 import { useWebSocket } from '../context/WebSocketContext';
 
 const MonitoringPage: React.FC = () => {
-  const { isInitializing, initializationError } = useWebSocket();
+  const { isInitializing, initializationError, retry } = useWebSocket();
 
   if (isInitializing) {
     return (
@@ -46,10 +46,26 @@ const MonitoringPage: React.FC = () => {
         <div className="error-state">
           <h2>Connection Error</h2>
           <p>Failed to initialize monitoring system:</p>
-          <pre className="error-details">{initializationError.message}</pre>
-          <button onClick={() => window.location.reload()}>
-            Retry Connection
-          </button>
+          <pre className="error-details">
+            {initializationError.message}
+            {initializationError.stack && (
+              <>
+                <br />
+                <br />
+                Stack trace:
+                <br />
+                {initializationError.stack}
+              </>
+            )}
+          </pre>
+          <div className="error-actions">
+            <button onClick={retry} className="retry-button">
+              Retry Connection
+            </button>
+            <button onClick={() => window.location.reload()} className="reload-button">
+              Reload Page
+            </button>
+          </div>
         </div>
 
         <style jsx>{`
@@ -61,6 +77,7 @@ const MonitoringPage: React.FC = () => {
             min-height: 100vh;
             text-align: center;
             color: var(--death-star-text);
+            padding: 2rem;
           }
 
           h2 {
@@ -82,6 +99,15 @@ const MonitoringPage: React.FC = () => {
             overflow-x: auto;
             color: #ff4444;
             font-size: 0.875rem;
+            text-align: left;
+            white-space: pre-wrap;
+            word-break: break-word;
+          }
+
+          .error-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
           }
 
           button {
@@ -92,11 +118,20 @@ const MonitoringPage: React.FC = () => {
             padding: 0.75rem 1.5rem;
             font-size: 1rem;
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: all 0.2s ease;
           }
 
           button:hover {
-            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+          }
+
+          .retry-button {
+            background: var(--death-star-primary);
+          }
+
+          .reload-button {
+            background: var(--death-star-secondary);
           }
         `}</style>
       </div>

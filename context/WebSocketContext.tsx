@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { WebSocketManager, WebSocketStatus } from '../lib/websocket';
+import WebSocketManager, { WebSocketStatus } from '../lib/websocket';
 import api from '../lib/api';
 import { WSMessage } from '../types/websocket';
 import { Config } from '../lib/config';
@@ -25,6 +25,7 @@ interface WebSocketContextValue {
   };
   isInitializing: boolean;
   initializationError: Error | null;
+  retry: () => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextValue | null>(null);
@@ -44,6 +45,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   const [isInitializing, setIsInitializing] = useState(true);
   const [initializationError, setInitializationError] = useState<Error | null>(null);
   const initializationAttempts = useRef(0);
+  const isInitialized = useRef(false);
 
   // Model Status WebSocket State
   const [modelStatusConnected, setModelStatusConnected] = useState(false);
@@ -60,8 +62,17 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   // Model Status WebSocket Methods
   const connectModelStatus = async (clientId?: string) => {
     try {
+      if (typeof window === 'undefined') {
+        throw new Error('Cannot connect WebSocket on server side');
+      }
+
       if (!modelStatusWsRef.current) {
-        modelStatusWsRef.current = WebSocketManager.getInstance('model-status');
+        modelStatusWsRef.current = WebSocketManager.getInstance('model-status', {
+          maxReconnectAttempts: Config.WS_RECONNECT_ATTEMPTS,
+          reconnectInterval: Config.WS_RECONNECT_INTERVAL,
+          connectionTimeout: Config.WS_CONNECTION_TIMEOUT,
+          pingInterval: Config.WS_PING_INTERVAL,
+        });
 
         modelStatusWsRef.current.onStatus((status) => {
           setModelStatusConnected(status === 'connected');
@@ -104,8 +115,17 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   // Terminal WebSocket Methods
   const connectTerminal = async (clientId?: string) => {
     try {
+      if (typeof window === 'undefined') {
+        throw new Error('Cannot connect WebSocket on server side');
+      }
+
       if (!terminalWsRef.current) {
-        terminalWsRef.current = WebSocketManager.getInstance('terminal');
+        terminalWsRef.current = WebSocketManager.getInstance('terminal', {
+          maxReconnectAttempts: Config.WS_RECONNECT_ATTEMPTS,
+          reconnectInterval: Config.WS_RECONNECT_INTERVAL,
+          connectionTimeout: Config.WS_CONNECTION_TIMEOUT,
+          pingInterval: Config.WS_PING_INTERVAL,
+        });
 
         terminalWsRef.current.onStatus((status) => {
           setTerminalConnected(status === 'connected');
@@ -147,7 +167,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 
   // Initialize WebSocket connections with retry logic
   const initializeWebSockets = async () => {
-    if (!autoConnect) {
+    if (!autoConnect || typeof window === 'undefined') {
       setIsInitializing(false);
       return;
     }
@@ -179,6 +199,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 
       setIsInitializing(false);
       initializationAttempts.current = 0;
+      isInitialized.current = true;
     } catch (error) {
       console.error('[WebSocket] Initialization error:', error);
       setInitializationError(error as Error);
@@ -196,16 +217,23 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     }
   };
 
-  // Auto-connect effect
-  useEffect(() => {
-    let mounted = true;
-
-    if (mounted) {
+  // Retry initialization
+  const retry = () => {
+    if (!isInitializing) {
+      WebSocketManager.cleanup();
+      initializationAttempts.current = 0;
+      isInitialized.current = false;
       initializeWebSockets();
     }
+  };
+
+  // Auto-connect effect
+  useEffect(() => {
+    if (typeof window === 'undefined' || isInitialized.current) return;
+
+    initializeWebSockets();
 
     return () => {
-      mounted = false;
       disconnectModelStatus();
       disconnectTerminal();
     };
@@ -232,6 +260,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     },
     isInitializing,
     initializationError,
+    retry,
   };
 
   return (

@@ -10,11 +10,12 @@ import {
   WebSocketError,
   WebSocketErrorCode
 } from './types';
+import { Config } from './config';
 
 export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 class WebSocketManager {
-  private static instance: WebSocketManager | null = null;
+  private static instances: Map<string, WebSocketManager> = new Map();
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts: number;
@@ -42,10 +43,10 @@ class WebSocketManager {
     this.storageKey = `ws_${endpoint}_state`;
     
     // Initialize configuration with defaults or provided values
-    this.maxReconnectAttempts = config?.maxReconnectAttempts || 5;
-    this.reconnectTimeout = config?.reconnectInterval || 1000;
-    this.connectionTimeout = config?.connectionTimeout || 10000;
-    this.pingIntervalTime = config?.pingInterval || 30000;
+    this.maxReconnectAttempts = config?.maxReconnectAttempts || Config.WS_RECONNECT_ATTEMPTS;
+    this.reconnectTimeout = config?.reconnectInterval || Config.WS_RECONNECT_INTERVAL;
+    this.connectionTimeout = config?.connectionTimeout || Config.WS_CONNECTION_TIMEOUT;
+    this.pingIntervalTime = config?.pingInterval || Config.WS_PING_INTERVAL;
 
     // Restore connection state
     this.restoreState();
@@ -98,15 +99,16 @@ class WebSocketManager {
 
   public static getInstance(endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>): WebSocketManager {
     try {
-      if (!WebSocketManager.instance) {
-        WebSocketManager.instance = new WebSocketManager(endpoint, config);
+      if (!WebSocketManager.instances.has(endpoint)) {
+        const instance = new WebSocketManager(endpoint, config);
+        WebSocketManager.instances.set(endpoint, instance);
         
         // Initialize connection
-        WebSocketManager.instance.connect().catch(error => {
+        instance.connect().catch(error => {
           console.error(`[WebSocket] Failed to initialize ${endpoint}:`, error);
         });
       }
-      return WebSocketManager.instance;
+      return WebSocketManager.instances.get(endpoint)!;
     } catch (error) {
       console.error('[WebSocket] Error creating instance:', error);
       throw error;
@@ -369,11 +371,18 @@ class WebSocketManager {
   }
 
   public static cleanup() {
-    if (WebSocketManager.instance) {
-      WebSocketManager.instance.disconnect();
-      WebSocketManager.instance = null;
-    }
+    WebSocketManager.instances.forEach((instance, endpoint) => {
+      instance.disconnect();
+    });
+    WebSocketManager.instances.clear();
   }
 }
 
+// Export a function for backward compatibility
+export const initializeWebSocket = (endpoint: 'model-status' | 'terminal', config?: Partial<WSConfig>): WebSocketManager => {
+  return WebSocketManager.getInstance(endpoint, config);
+};
+
+// Export the WebSocketManager class as default
+export { WebSocketManager };
 export default WebSocketManager; 
