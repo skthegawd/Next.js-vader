@@ -1,4 +1,5 @@
 import api from './api';
+import { Config } from './config';
 import type { ThemeData } from './types';
 
 interface ThemeColors {
@@ -31,7 +32,8 @@ class ThemeManager {
 
   private constructor() {
     if (typeof window !== 'undefined') {
-      this.currentTheme = this.loadThemeFromStorage() || this.getDefaultTheme();
+      this.currentTheme = this.loadThemeFromStorage() || Config.DEFAULT_THEME;
+      this.applyTheme(this.currentTheme);
     }
   }
 
@@ -45,83 +47,68 @@ class ThemeManager {
   private loadThemeFromStorage(): ThemeConfig | null {
     if (typeof window === 'undefined') return null;
     
-    const stored = localStorage.getItem('death-star-theme');
-    if (!stored) return null;
-    
     try {
-      return JSON.parse(stored);
+      const stored = localStorage.getItem(Config.THEME_STORAGE_KEY);
+      if (!stored) return null;
+      
+      const theme = JSON.parse(stored);
+      // Validate theme structure
+      if (!theme.colors || !theme.fonts || !theme.name) {
+        return null;
+      }
+      return theme;
     } catch (error) {
-      console.error('[Theme] Failed to parse stored theme:', error);
+      console.warn('[Theme] Failed to parse stored theme:', error);
       return null;
     }
   }
 
-  private getDefaultTheme(): ThemeConfig {
-    return {
-      name: 'default',
-      colors: {
-        primary: '#FF0000',
-        secondary: '#000000',
-        background: '#1A1A1A',
-        text: '#FFFFFF',
-        accent: '#FFE81F',
-      },
-      fonts: {
-        primary: {
-          family: 'system-ui',
-          weight: 400,
-          size: '16px',
-        },
-        secondary: {
-          family: 'system-ui',
-          weight: 400,
-          size: '14px',
-        },
-      },
-    };
-  }
-
   public async initialize(): Promise<{ theme: string }> {
     try {
+      // First try to load from storage
+      const storedTheme = this.loadThemeFromStorage();
+      if (storedTheme) {
+        this.currentTheme = storedTheme;
+        this.applyTheme(storedTheme);
+        return { theme: storedTheme.name };
+      }
+
+      // Then try to get from API
       const { data } = await api.getTheme();
       const theme = this.processThemeData(data);
       this.currentTheme = theme;
       this.applyTheme(theme);
       return { theme: theme.name };
     } catch (error) {
-      console.error('[Theme] Failed to initialize theme:', error);
-      const defaultTheme = this.getDefaultTheme();
+      console.warn('[Theme] Failed to initialize theme from API, using default:', error);
+      // Use default theme from config
+      const defaultTheme = Config.DEFAULT_THEME;
       this.currentTheme = defaultTheme;
       this.applyTheme(defaultTheme);
       return { theme: defaultTheme.name };
     }
   }
 
-  public getCurrentTheme(): ThemeConfig | null {
-    return this.currentTheme;
+  public getCurrentTheme(): ThemeConfig {
+    return this.currentTheme || Config.DEFAULT_THEME;
   }
 
   private processThemeData(data: ThemeData): ThemeConfig {
+    const defaultTheme = Config.DEFAULT_THEME;
     return {
-      name: data.name,
+      name: data.name || defaultTheme.name,
       colors: {
-        primary: data.colors.primary || '#FF0000',
-        secondary: data.colors.secondary || '#000000',
-        background: data.colors.background || '#1A1A1A',
-        text: data.colors.text || '#FFFFFF',
-        accent: data.colors.accent || '#FFE81F',
+        ...defaultTheme.colors,
         ...data.colors,
       },
       fonts: {
         primary: {
-          family: data.fonts.primary || 'system-ui',
-          weight: 400,
-          size: '16px',
+          ...defaultTheme.fonts.primary,
+          family: data.fonts.primary || defaultTheme.fonts.primary.family,
         },
         secondary: {
-          family: data.fonts.secondary || 'system-ui',
-          weight: 400,
-          size: '14px',
+          ...defaultTheme.fonts.secondary,
+          family: data.fonts.secondary || defaultTheme.fonts.secondary.family,
         },
       },
     };
@@ -130,33 +117,42 @@ class ThemeManager {
   private applyTheme(theme: ThemeConfig): void {
     if (typeof window === 'undefined') return;
 
-    document.documentElement.setAttribute('data-theme', theme.name);
+    try {
+      document.documentElement.setAttribute('data-theme', theme.name);
 
-    Object.entries(theme.colors).forEach(([key, value]) => {
-      document.documentElement.style.setProperty(`--death-star-${key}`, value);
-    });
+      // Apply colors
+      Object.entries(theme.colors).forEach(([key, value]) => {
+        document.documentElement.style.setProperty(`--death-star-${key}`, value);
+      });
 
-    document.documentElement.style.setProperty(
-      '--death-star-font-primary',
-      theme.fonts.primary.family
-    );
-    document.documentElement.style.setProperty(
-      '--death-star-font-secondary',
-      theme.fonts.secondary.family
-    );
+      // Apply fonts
+      document.documentElement.style.setProperty(
+        '--death-star-font-primary',
+        theme.fonts.primary.family
+      );
+      document.documentElement.style.setProperty(
+        '--death-star-font-secondary',
+        theme.fonts.secondary.family
+      );
 
-    localStorage.setItem('death-star-theme', JSON.stringify(theme));
-    this.currentTheme = theme;
+      // Store theme
+      localStorage.setItem(Config.THEME_STORAGE_KEY, JSON.stringify(theme));
+      this.currentTheme = theme;
+    } catch (error) {
+      console.error('[Theme] Failed to apply theme:', error);
+    }
   }
 
   public generateCssVariables(): string {
-    const theme = this.currentTheme || this.getDefaultTheme();
+    const theme = this.getCurrentTheme();
     let css = ':root {\n';
 
+    // Add colors
     Object.entries(theme.colors).forEach(([key, value]) => {
       css += `  --death-star-${key}: ${value};\n`;
     });
 
+    // Add fonts
     Object.entries(theme.fonts).forEach(([key, value]) => {
       css += `  --death-star-font-${key}: ${value.family};\n`;
       css += `  --death-star-font-${key}-weight: ${value.weight};\n`;
