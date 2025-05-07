@@ -68,8 +68,13 @@ export class WebSocketManager extends EventEmitter {
         wsUrl.protocol = 'wss:';
       }
 
-      // Use root path for simpler connection
-      wsUrl.pathname = '/';
+      // Use /api/ws path for WebSocket endpoint
+      wsUrl.pathname = '/api/ws';
+
+      // Add required query parameters
+      wsUrl.searchParams.set('endpoint', this.endpoint);
+      wsUrl.searchParams.set('client_id', this.clientId);
+      wsUrl.searchParams.set('version', 'v1');
 
       const finalUrl = wsUrl.toString();
       console.log('[WebSocketManager] Connecting to:', finalUrl);
