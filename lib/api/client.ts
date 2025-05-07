@@ -39,25 +39,6 @@ class ApiClient implements IApi {
   });
 
   constructor() {
-    this.axios.interceptors.request.use(
-      (config) => {
-        if (config.url && !config.url.startsWith('/api/')) {
-          config.url = `/api${config.url}`;
-        }
-        
-        console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, {
-          baseURL: config.baseURL,
-          headers: config.headers,
-          data: config.data
-        });
-        return config;
-      },
-      (error) => {
-        console.error('[API] Request Error:', error);
-        return Promise.reject(error);
-      }
-    );
-
     this.axios.interceptors.response.use(
       (response) => {
         console.log(`[API] Response ${response.status}:`, {
