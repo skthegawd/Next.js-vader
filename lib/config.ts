@@ -1,6 +1,6 @@
 export const Config = {
   // WebSocket Configuration
-  WS_URL: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws',
+  WS_URL: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000',
   WS_RECONNECT_ATTEMPTS: Number(process.env.NEXT_PUBLIC_WS_RECONNECT_ATTEMPTS) || 5,
   WS_RECONNECT_INTERVAL: Number(process.env.NEXT_PUBLIC_WS_RECONNECT_INTERVAL) || 1000,
   WS_CONNECTION_TIMEOUT: Number(process.env.NEXT_PUBLIC_WS_CONNECTION_TIMEOUT) || 10000,
