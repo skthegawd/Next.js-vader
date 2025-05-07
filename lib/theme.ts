@@ -80,7 +80,19 @@ class ThemeManager {
       this.applyTheme(theme);
       return { theme: theme.name };
     } catch (error) {
-      console.warn('[Theme] Failed to initialize theme from API, using default:', error);
+      let errorMsg = '';
+      if (error instanceof Error) {
+        errorMsg = error.message;
+      } else if (typeof error === 'object') {
+        try {
+          errorMsg = JSON.stringify(error);
+        } catch {
+          errorMsg = String(error);
+        }
+      } else {
+        errorMsg = String(error);
+      }
+      console.warn('[Theme] Failed to initialize theme from API, using default:', errorMsg);
       // Use default theme from config
       const defaultTheme = Config.DEFAULT_THEME;
       this.currentTheme = defaultTheme;

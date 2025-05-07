@@ -2,12 +2,19 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../lib/api/client';
+import { ApiError } from '../lib/api';
 import { tts_api_tts, stt_api_stt, wakeword_api_wakeword } from '../lib/voice';
 import { ModelStatusIndicator } from './ModelStatusIndicator';
 
 interface ModelParams {
     temperature: number;
     maxTokens: number;
+}
+
+interface ErrorState {
+    message: string;
+    isRetryable: boolean;
+    retryCount: number;
 }
 
 const VoiceAssistant: React.FC = () => {
@@ -21,9 +28,11 @@ const VoiceAssistant: React.FC = () => {
         maxTokens: 2048
     });
     const [voiceEnabled, setVoiceEnabled] = useState(true);
+    const [error, setError] = useState<ErrorState | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const currentMessageRef = useRef('');
+    const lastMessageRef = useRef('');
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -46,18 +55,31 @@ const VoiceAssistant: React.FC = () => {
                 }
             } catch (error) {
                 console.error("[ERROR] Wakeword detection failed:", error);
+                setError({
+                    message: "Voice detection unavailable. Please use text input.",
+                    isRetryable: false,
+                    retryCount: 0
+                });
             }
         };
         listenForWakeword();
     }, []);
 
+    const handleRetry = () => {
+        if (!lastMessageRef.current) return;
+        handleSend(lastMessageRef.current);
+    };
+
     const handleSend = async (text: string) => {
         if (!text.trim() || loading) return;
+        
         setLoading(true);
+        setError(null);
         const userMessage = `> ${text}`;
         setMessages(prev => [...prev, userMessage]);
         setInput('');
         currentMessageRef.current = '';
+        lastMessageRef.current = text;
 
         try {
             console.log("[DEBUG] Sending request to AI...");
@@ -93,7 +115,27 @@ const VoiceAssistant: React.FC = () => {
             }
         } catch (error) {
             console.error("[ERROR] AI Processing Failed:", error);
-            setMessages(prev => [...prev, "[Error] Unable to process command. Try again."]);
+            
+            if (error instanceof ApiError) {
+                setError({
+                    message: error.message,
+                    isRetryable: error.isNetworkError || error.status >= 500,
+                    retryCount: error.retryCount
+                });
+                
+                setMessages(prev => [...prev, 
+                    `[Error] ${error.message}${error.isNetworkError ? 
+                        ". Please check your connection." : 
+                        ". Please try again later."}`
+                ]);
+            } else {
+                setError({
+                    message: "An unexpected error occurred",
+                    isRetryable: false,
+                    retryCount: 0
+                });
+                setMessages(prev => [...prev, "[Error] Unable to process command. Try again."]);
+            }
         } finally {
             setLoading(false);
             currentMessageRef.current = '';
@@ -111,6 +153,18 @@ const VoiceAssistant: React.FC = () => {
                     {messages.map((msg, index) => (
                         <p key={index} className="whitespace-pre-wrap">{msg}</p>
                     ))}
+                    {error?.isRetryable && (
+                        <div className="error-container">
+                            <p className="text-red-500">{error.message}</p>
+                            <button 
+                                onClick={handleRetry}
+                                className="retry-button"
+                                disabled={loading}
+                            >
+                                Retry Request
+                            </button>
+                        </div>
+                    )}
                     <div ref={messagesEndRef} />
                 </div>
                 <div className="terminal-input">
@@ -171,6 +225,30 @@ const VoiceAssistant: React.FC = () => {
                 }
                 .terminal-output {
                     max-height: calc(100vh - 300px);
+                }
+                .error-container {
+                    margin: 1rem 0;
+                    padding: 1rem;
+                    border: 1px solid #ff4444;
+                    border-radius: 4px;
+                    background: rgba(255, 68, 68, 0.1);
+                }
+                .retry-button {
+                    margin-top: 0.5rem;
+                    padding: 0.5rem 1rem;
+                    background: #ff4444;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    transition: background 0.2s;
+                }
+                .retry-button:hover:not(:disabled) {
+                    background: #ff6666;
+                }
+                .retry-button:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
                 }
             `}</style>
         </div>
