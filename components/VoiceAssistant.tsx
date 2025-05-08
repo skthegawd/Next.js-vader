@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { apiClient } from '../lib/api/client';
+import api from '../lib/api';
 import { ApiError } from '../lib/api';
 import { tts_api_tts, stt_api_stt, wakeword_api_wakeword } from '../lib/voice';
 import { ModelStatusIndicator } from './ModelStatusIndicator';
@@ -86,7 +86,7 @@ const VoiceAssistant: React.FC = () => {
             
             if (isStreaming) {
                 setMessages(prev => [...prev, '']);
-                await apiClient.sendToAI(text, {
+                await api.sendToAI(text, {
                     stream: true,
                     onChunk: (chunk: string) => {
                         currentMessageRef.current += chunk;
@@ -99,7 +99,7 @@ const VoiceAssistant: React.FC = () => {
                     maxTokens: modelParams.maxTokens
                 });
             } else {
-                const response = await apiClient.sendToAI(text, {
+                const response = await api.sendToAI(text, {
                     temperature: modelParams.temperature,
                     maxTokens: modelParams.maxTokens
                 });
