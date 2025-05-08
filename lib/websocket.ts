@@ -128,7 +128,7 @@ class WebSocketManager {
 
       const url = new URL(baseUrl);
       url.protocol = url.protocol.replace('http', 'ws');
-      url.pathname = '/ws';
+      url.pathname = '/api/ws';
       
       url.searchParams.append('endpoint', this.endpoint);
       url.searchParams.append('client_id', this.clientId);
