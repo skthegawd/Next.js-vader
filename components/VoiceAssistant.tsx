@@ -17,6 +17,24 @@ interface ErrorState {
     retryCount: number;
 }
 
+// Helper to extract chat messages from various backend response formats
+function extractChatMessages(response: any): { role: string, content: string }[] {
+    if (response?.data?.messages) {
+        // Non-streaming response (array of messages)
+        return response.data.messages;
+    } else if (response?.data?.content) {
+        // Streaming or direct content response
+        return [{
+            role: response.data.role || 'assistant',
+            content: response.data.content
+        }];
+    } else if (response?.messages) {
+        // Flattened response
+        return response.messages;
+    }
+    return [];
+}
+
 const VoiceAssistant: React.FC = () => {
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<string[]>(["Lord Vader, your AI assistant is at your command."]);
@@ -108,9 +126,16 @@ const VoiceAssistant: React.FC = () => {
                     throw new Error(response.error);
                 }
 
-                setMessages(prev => [...prev, response.response]);
-                if (voiceEnabled && response.tts_audio) {
-                    await tts_api_tts(response.response);
+                // Use helper to extract reply from backend response
+                const messagesArr = extractChatMessages(response);
+                const reply = messagesArr.find(m => m.role === 'assistant')?.content
+                    || messagesArr[messagesArr.length - 1]?.content
+                    || response.response
+                    || response.message
+                    || '';
+                setMessages(prev => [...prev, reply]);
+                if (voiceEnabled && reply) {
+                    await tts_api_tts(reply);
                 }
             }
         } catch (error) {
