@@ -201,7 +201,7 @@ const api = {
       }
 
       const response = await axiosInstance.post('/api/chat', {
-        query: message,
+        content: message,
         temperature: options.temperature,
         max_tokens: options.maxTokens,
       });
