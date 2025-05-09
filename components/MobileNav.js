@@ -1,19 +1,19 @@
 "use client";
 import Link from 'next/link';
-import { useRouter } from 'next/router';
+import { usePathname } from 'next/navigation';
 
 export default function MobileNav() {
-    const router = useRouter();
+    const pathname = usePathname();
 
     return (
         <nav className="mobile-nav">
-            <Link href="/" className={router.pathname === '/' ? 'active' : ''}>
+            <Link href="/" className={pathname === '/' ? 'active' : ''}>
                 Home
             </Link>
-            <Link href="/chat" className={router.pathname === '/chat' ? 'active' : ''}>
+            <Link href="/chat" className={pathname === '/chat' ? 'active' : ''}>
                 Chat
             </Link>
-            <Link href="/terminal" className={router.pathname === '/terminal' ? 'active' : ''}>
+            <Link href="/terminal" className={pathname === '/terminal' ? 'active' : ''}>
                 Terminal
             </Link>
 
