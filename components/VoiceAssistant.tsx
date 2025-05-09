@@ -5,16 +5,13 @@ import api from '../lib/api';
 import { ApiError } from '../lib/api';
 import { tts_api_tts, stt_api_stt, wakeword_api_wakeword } from '../lib/voice';
 import { ModelStatusIndicator } from './ModelStatusIndicator';
+import React, { createContext, useReducer, useContext } from 'react';
+import { getOrCreateSessionId } from '../lib/config';
+import type { ChatContextState, ChatMessage, SessionState, StreamingState, ErrorState, RateLimitState } from '../lib/types';
 
 interface ModelParams {
     temperature: number;
     maxTokens: number;
-}
-
-interface ErrorState {
-    message: string;
-    isRetryable: boolean;
-    retryCount: number;
 }
 
 // Helper to extract chat messages from various backend response formats
@@ -35,18 +32,97 @@ function extractChatMessages(response: any): { role: string, content: string }[]
     return [];
 }
 
+// Initial state for context
+const initialSession: SessionState = {
+    sessionId: getOrCreateSessionId(),
+    isActive: true,
+    lastActivity: Date.now(),
+    messageCount: 0,
+};
+const initialStreaming: StreamingState = {
+    isStreaming: false,
+    currentChunk: '',
+    error: null,
+    eventSource: null,
+};
+const initialError: ErrorState = {
+    hasError: false,
+    errorMessage: '',
+    errorDetails: null,
+    retryCount: 0,
+    retryAfter: 0,
+};
+const initialRateLimit: RateLimitState = {
+    isLimited: false,
+    retryAfter: 0,
+    lastRequest: 0,
+};
+
+const ChatContext = createContext<ChatContextState | undefined>(undefined);
+
+function chatReducer(state: Omit<ChatContextState, 'setMessages' | 'addMessage' | 'setStreaming' | 'setError' | 'setRateLimit' | 'reset'>, action: any) {
+    switch (action.type) {
+        case 'SET_MESSAGES':
+            return { ...state, messages: action.payload };
+        case 'ADD_MESSAGE':
+            return { ...state, messages: [...state.messages, action.payload] };
+        case 'SET_STREAMING':
+            return { ...state, streaming: { ...state.streaming, ...action.payload } };
+        case 'SET_ERROR':
+            return { ...state, error: { ...state.error, ...action.payload } };
+        case 'SET_RATELIMIT':
+            return { ...state, rateLimit: { ...state.rateLimit, ...action.payload } };
+        case 'RESET':
+            return {
+                ...state,
+                session: { ...initialSession, sessionId: getOrCreateSessionId() },
+                streaming: initialStreaming,
+                error: initialError,
+                rateLimit: initialRateLimit,
+                messages: [],
+            };
+        default:
+            return state;
+    }
+}
+
+export function ChatProvider({ children }: { children: React.ReactNode }) {
+    const [state, dispatch] = useReducer(chatReducer, {
+        session: initialSession,
+        streaming: initialStreaming,
+        error: initialError,
+        rateLimit: initialRateLimit,
+        messages: [],
+    });
+    const setMessages = (msgs: ChatMessage[]) => dispatch({ type: 'SET_MESSAGES', payload: msgs });
+    const addMessage = (msg: ChatMessage) => dispatch({ type: 'ADD_MESSAGE', payload: msg });
+    const setStreaming = (s: Partial<StreamingState>) => dispatch({ type: 'SET_STREAMING', payload: s });
+    const setError = (e: Partial<ErrorState>) => dispatch({ type: 'SET_ERROR', payload: e });
+    const setRateLimit = (r: Partial<RateLimitState>) => dispatch({ type: 'SET_RATELIMIT', payload: r });
+    const reset = () => dispatch({ type: 'RESET' });
+    return (
+        <ChatContext.Provider value={{ ...state, setMessages, addMessage, setStreaming, setError, setRateLimit, reset }}>
+            {children}
+        </ChatContext.Provider>
+    );
+}
+
+export function useChat() {
+    const ctx = useContext(ChatContext);
+    if (!ctx) throw new Error('useChat must be used within a ChatProvider');
+    return ctx;
+}
+
 const VoiceAssistant: React.FC = () => {
     const [input, setInput] = useState('');
-    const [messages, setMessages] = useState<string[]>(["Lord Vader, your AI assistant is at your command."]);
+    const { messages, setMessages, setStreaming, setError, setRateLimit } = useChat();
     const [loading, setLoading] = useState(false);
     const [wakewordDetected, setWakewordDetected] = useState(false);
-    const [isStreaming, setIsStreaming] = useState(false);
     const [modelParams, setModelParams] = useState<ModelParams>({
         temperature: 0.7,
         maxTokens: 2048
     });
     const [voiceEnabled, setVoiceEnabled] = useState(true);
-    const [error, setError] = useState<ErrorState | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const currentMessageRef = useRef('');
@@ -102,7 +178,7 @@ const VoiceAssistant: React.FC = () => {
         try {
             console.log("[DEBUG] Sending request to AI...");
             
-            if (isStreaming) {
+            if (setStreaming.isStreaming) {
                 setMessages(prev => [...prev, '']);
                 await api.sendToAI(text, {
                     stream: true,
@@ -178,9 +254,9 @@ const VoiceAssistant: React.FC = () => {
                     {messages.map((msg, index) => (
                         <p key={index} className="whitespace-pre-wrap">{msg}</p>
                     ))}
-                    {error?.isRetryable && (
+                    {setError.isRetryable && (
                         <div className="error-container">
-                            <p className="text-red-500">{error.message}</p>
+                            <p className="text-red-500">{setError.message}</p>
                             <button 
                                 onClick={handleRetry}
                                 className="retry-button"
@@ -204,9 +280,9 @@ const VoiceAssistant: React.FC = () => {
                             disabled={loading}
                         />
                         <button 
-                            onClick={() => setIsStreaming(!isStreaming)}
-                            className={`px-3 py-1 rounded ${isStreaming ? 'bg-green-600' : 'bg-gray-600'}`}
-                            title={isStreaming ? 'Streaming enabled' : 'Streaming disabled'}
+                            onClick={() => setStreaming({ isStreaming: !setStreaming.isStreaming })}
+                            className={`px-3 py-1 rounded ${setStreaming.isStreaming ? 'bg-green-600' : 'bg-gray-600'}`}
+                            title={setStreaming.isStreaming ? 'Streaming enabled' : 'Streaming disabled'}
                         >
                             <span className="sr-only">Toggle Streaming</span>
                             ⚡

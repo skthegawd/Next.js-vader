@@ -1,5 +1,6 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import type { ApiConfig, ApiResponse, SessionData, ThemeData } from './types';
+import { getOrCreateSessionId } from './config';
 
 // API Error class with better error categorization
 export class ApiError extends Error {
@@ -152,38 +153,48 @@ const api = {
 
   async streamChat(
     message: string,
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: any) => void,
+    options: {
+      temperature?: number;
+      maxTokens?: number;
+    } = {}
   ): Promise<void> {
-    try {
-      const response = await axiosInstance.post(
-        '/api/next/chat/stream',
-        { message },
-        {
-          responseType: 'stream',
-        }
-      );
-
-      const reader = response.data.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6));
-            onChunk(data);
+    // Use EventSource for SSE streaming
+    const session_id = getOrCreateSessionId();
+    const params = new URLSearchParams({ session_id });
+    const url = `/api/chat/stream?${params.toString()}`;
+    return new Promise((resolve, reject) => {
+      const eventSource = new EventSource(url);
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          onChunk(data);
+          if (data.type === 'stream_end') {
+            eventSource.close();
+            resolve();
           }
+        } catch (err) {
+          eventSource.close();
+          reject(err);
         }
-      }
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      throw ApiError.fromAxiosError(error as AxiosError);
-    }
+      };
+      eventSource.onerror = (err) => {
+        eventSource.close();
+        reject(err);
+      };
+      // Send initial message via fetch to start the stream
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: message,
+          session_id,
+          stream: true,
+          temperature: options.temperature,
+          max_tokens: options.maxTokens,
+        }),
+      });
+    });
   },
 
   async sendToAI(
@@ -202,6 +213,7 @@ const api = {
 
       const response = await axiosInstance.post('/api/chat', {
         content: message,
+        session_id: getOrCreateSessionId(),
         temperature: options.temperature,
         max_tokens: options.maxTokens,
       });

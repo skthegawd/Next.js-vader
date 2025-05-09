@@ -47,4 +47,28 @@ export const Config = {
 } as const;
 
 export type ConfigType = typeof Config;
-export default Config; 
+export default Config;
+
+// Helper to generate a UUID (RFC4122 v4)
+export function generateSessionId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for environments without crypto.randomUUID
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+export function getOrCreateSessionId(): string {
+  let sessionId = '';
+  if (typeof window !== 'undefined') {
+    sessionId = localStorage.getItem('chat_session_id') || '';
+    if (!sessionId) {
+      sessionId = generateSessionId();
+      localStorage.setItem('chat_session_id', sessionId);
+    }
+  }
+  return sessionId;
+} 

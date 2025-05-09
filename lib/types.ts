@@ -48,4 +48,57 @@ export class WebSocketError extends Error {
     this.name = 'WebSocketError';
     this.code = code;
   }
+}
+
+// Chat message type
+export interface ChatMessage {
+  role: string;
+  content: string;
+}
+
+// Session state
+export interface SessionState {
+  sessionId: string;
+  isActive: boolean;
+  lastActivity: number;
+  messageCount: number;
+}
+
+// Streaming state
+export interface StreamingState {
+  isStreaming: boolean;
+  currentChunk: string;
+  error: string | null;
+  eventSource: EventSource | null;
+}
+
+// Error state
+export interface ErrorState {
+  hasError: boolean;
+  errorMessage: string;
+  errorDetails: any;
+  retryCount: number;
+  retryAfter: number;
+}
+
+// Rate limit state
+export interface RateLimitState {
+  isLimited: boolean;
+  retryAfter: number;
+  lastRequest: number;
+}
+
+// Chat context state
+export interface ChatContextState {
+  session: SessionState;
+  streaming: StreamingState;
+  error: ErrorState;
+  rateLimit: RateLimitState;
+  messages: ChatMessage[];
+  setMessages: (msgs: ChatMessage[]) => void;
+  addMessage: (msg: ChatMessage) => void;
+  setStreaming: (s: Partial<StreamingState>) => void;
+  setError: (e: Partial<ErrorState>) => void;
+  setRateLimit: (r: Partial<RateLimitState>) => void;
+  reset: () => void;
 } 
