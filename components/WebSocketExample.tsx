@@ -111,7 +111,7 @@ export const WebSocketExample = () => {
             No messages yet. Start chatting!
           </div>
         ) : (
-          messages.map((msg, index) => (
+          (Array.isArray(messages) ? messages : []).map((msg, index) => (
             <div key={index} className="mb-4">
               <div className="text-sm text-gray-500">
                 {new Date(msg.timestamp).toLocaleTimeString()}

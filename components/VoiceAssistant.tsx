@@ -251,7 +251,7 @@ const VoiceAssistant: React.FC = () => {
             <div className="terminal flex-grow">
                 <div className={`wakeword-indicator ${wakewordDetected ? "active" : ""}`}></div>
                 <div className="terminal-output overflow-y-auto">
-                    {messages.map((msg, index) => (
+                    {(Array.isArray(messages) ? messages : []).map((msg, index) => (
                         <p key={index} className="whitespace-pre-wrap">{msg}</p>
                     ))}
                     {setError.isRetryable && (
