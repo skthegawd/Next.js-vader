@@ -38,7 +38,7 @@ export default function TerminalUI() {
     return (
         <div className="terminal">
             <div className="terminal-output">
-                {messages.map((msg, index) => (
+                {(Array.isArray(messages) ? messages : []).map((msg, index) => (
                     <p key={index}>{msg}</p>
                 ))}
             </div>
