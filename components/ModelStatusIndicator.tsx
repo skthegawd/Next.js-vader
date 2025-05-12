@@ -1,38 +1,37 @@
 import React, { useEffect, useState } from 'react';
-import { useWebSocket } from '../context/WebSocketContext';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { WSMessage } from '../types/websocket';
 
+const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "";
+
 const ModelStatusIndicator: React.FC = () => {
-  const [status, setStatus] = useState('loading');
-  const { modelStatus } = useWebSocket();
+  const [modelStatus, setModelStatus] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState("disconnected");
+  const [lastPong, setLastPong] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => {
-    if (!modelStatus.isConnected) return;
-
-    const handleStatusUpdate = (message: WSMessage) => {
-      if (message.type === 'status') {
-        setStatus(message.data.status);
-      }
-    };
-
-    modelStatus.onMessage?.(handleStatusUpdate);
-
-    // Request initial status
-    modelStatus.sendMessage?.({
-      type: 'command',
-      command: 'get_model_status',
-      timestamp: new Date().toISOString()
-    });
-
-    return () => {
-      modelStatus.offMessage?.(handleStatusUpdate);
-    };
-  }, [modelStatus.isConnected]);
+  const { status, sendMessage, refreshModelStatus } = useWebSocket(
+    wsUrl,
+    {
+      config: { endpoint: "model-status" },
+      onModelStatus: (payload) => setModelStatus(payload),
+      onConnection: () => setConnectionStatus("connected"),
+      onPong: (msg) => setLastPong(msg.timestamp || new Date().toISOString()),
+      onError: (err) => setError(err),
+      onStatusChange: (s) => setConnectionStatus(s),
+    }
+  );
 
   return (
     <div className="status-indicator">
       <span className={`status-dot ${status}`} />
       <span className="status-text">{status}</span>
+
+      <div>Status: {connectionStatus}</div>
+      <button onClick={refreshModelStatus}>Refresh Model Status</button>
+      {lastPong && <div>Last pong: {lastPong}</div>}
+      {error && <div style={{ color: 'red' }}>Error: {error.message}</div>}
+      <pre>{JSON.stringify(modelStatus, null, 2)}</pre>
 
       <style jsx>{`
         .status-indicator {

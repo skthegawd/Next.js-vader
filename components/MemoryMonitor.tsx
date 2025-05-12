@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useWebSocket } from '../context/WebSocketContext';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 interface MemoryStats {
   rss_mb: number;
@@ -8,13 +8,30 @@ interface MemoryStats {
   system_available_mb: number;
 }
 
-export const MemoryMonitor: React.FC = () => {
+const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "";
+
+const MemoryMonitor = () => {
+  const [modelStatus, setModelStatus] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState("disconnected");
+  const [lastPong, setLastPong] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [memoryStats, setMemoryStats] = useState<MemoryStats | null>(null);
-  const { modelStatus } = useWebSocket();
+
+  const { status, sendMessage, refreshModelStatus } = useWebSocket(
+    wsUrl,
+    {
+      config: { endpoint: "model-status" },
+      onModelStatus: (payload) => setModelStatus(payload),
+      onConnection: () => setConnectionStatus("connected"),
+      onPong: (msg) => setLastPong(msg.timestamp || new Date().toISOString()),
+      onError: (err) => setError(err),
+      onStatusChange: (s) => setConnectionStatus(s),
+    }
+  );
 
   // Subscribe to memory stats updates
   React.useEffect(() => {
-    if (!modelStatus.isConnected) return;
+    if (!modelStatus) return;
 
     const handleMemoryStats = (message: any) => {
       if (message.type === 'memory_stats') {
@@ -26,7 +43,7 @@ export const MemoryMonitor: React.FC = () => {
     modelStatus.onMessage?.(handleMemoryStats);
 
     // Request initial memory stats
-    modelStatus.sendMessage?.({
+    sendMessage?.({
       type: 'command',
       command: 'get_memory_stats',
       timestamp: new Date().toISOString()
@@ -35,7 +52,7 @@ export const MemoryMonitor: React.FC = () => {
     return () => {
       modelStatus.offMessage?.(handleMemoryStats);
     };
-  }, [modelStatus.isConnected]);
+  }, [modelStatus]);
 
   if (!memoryStats) {
     return (
@@ -63,6 +80,12 @@ export const MemoryMonitor: React.FC = () => {
           <span>{memoryStats.system_available_mb.toFixed(2)} MB</span>
         </div>
       </div>
+
+      <div>Status: {connectionStatus}</div>
+      <button onClick={refreshModelStatus}>Refresh Model Status</button>
+      {lastPong && <div>Last pong: {lastPong}</div>}
+      {error && <div style={{ color: 'red' }}>Error: {error.message}</div>}
+      <pre>{JSON.stringify(modelStatus, null, 2)}</pre>
 
       <style jsx>{`
         .memory-monitor {
@@ -109,4 +132,6 @@ export const MemoryMonitor: React.FC = () => {
       `}</style>
     </div>
   );
-}; 
+};
+
+export default MemoryMonitor; 

@@ -11,7 +11,9 @@ interface WebSocketConfig {
 
 interface WebSocketOptions {
   config: WebSocketConfig;
-  onMessage?: (message: any) => void;
+  onModelStatus?: (payload: any) => void;
+  onConnection?: (msg: any) => void;
+  onPong?: (msg: any) => void;
   onError?: (error: Error) => void;
   onStatusChange?: (status: ConnectionStatus) => void;
   onMaxRetriesReached?: () => void;
@@ -26,6 +28,7 @@ interface WebSocketHookResult {
   getClientId: () => string;
   isConnected: boolean;
   retryCount: number;
+  refreshModelStatus: () => void;
 }
 
 export const useWebSocket = (
@@ -39,23 +42,31 @@ export const useWebSocket = (
   const maxRetries = options.config.maxRetries ?? 5;
   const retryInterval = options.config.retryInterval ?? 3000;
 
+  // Helper to send get_model_status
+  const refreshModelStatus = useCallback(() => {
+    if (wsRef.current && wsRef.current.getStatus() === 'connected') {
+      wsRef.current.send({ type: 'get_model_status' });
+    }
+  }, []);
+
   const handleStatusChange = useCallback((newStatus: ConnectionStatus) => {
     console.log(`[WebSocket Hook] Status changed to: ${newStatus}`);
     setStatus(newStatus);
     options.onStatusChange?.(newStatus);
-
     if (newStatus === 'connected') {
       setRetryCount(0);
       setError(null);
+      // On connect, send get_model_status if endpoint is model-status
+      if (options.config.endpoint === 'model-status') {
+        refreshModelStatus();
+      }
     }
-  }, [options]);
+  }, [options, refreshModelStatus]);
 
   const handleError = useCallback((err: Error) => {
     console.error('[WebSocket Hook] Error:', err);
     setError(err);
     options.onError?.(err);
-
-    // Increment retry count
     setRetryCount(prev => {
       const newCount = prev + 1;
       if (newCount >= maxRetries) {
@@ -66,13 +77,38 @@ export const useWebSocket = (
     });
   }, [maxRetries, options]);
 
+  const handleMessage = useCallback((msg: any) => {
+    switch (msg.type) {
+      case 'connection_established':
+        options.onConnection?.(msg);
+        // Optionally, send get_model_status if endpoint is model-status
+        if (options.config.endpoint === 'model-status') {
+          refreshModelStatus();
+        }
+        break;
+      case 'pong':
+        options.onPong?.(msg);
+        break;
+      case 'model_status':
+        options.onModelStatus?.(msg.payload);
+        break;
+      case 'error':
+        setError(new Error(msg.payload?.message || 'WebSocket error'));
+        options.onError?.(new Error(msg.payload?.message || 'WebSocket error'));
+        break;
+      default:
+        // Optionally handle other message types
+        break;
+    }
+  }, [options, refreshModelStatus]);
+
   const initializeWebSocket = useCallback(() => {
     if (!wsRef.current) {
       console.log(`[WebSocket Hook] Initializing WebSocket for endpoint: ${options.config.endpoint}`);
       wsRef.current = WebSocketManager.getInstance(options.config.endpoint);
 
       wsRef.current.on('statusChange', handleStatusChange);
-      wsRef.current.on('message', options.onMessage || (() => {}));
+      wsRef.current.on('message', handleMessage);
       wsRef.current.on('error', handleError);
 
       wsRef.current.connect({
@@ -82,7 +118,7 @@ export const useWebSocket = (
         reconnectInterval: retryInterval
       });
     }
-  }, [url, options.config, handleStatusChange, handleError, maxRetries, retryInterval]);
+  }, [url, options.config, handleStatusChange, handleError, handleMessage, maxRetries, retryInterval]);
 
   useEffect(() => {
     initializeWebSocket();
@@ -142,6 +178,7 @@ export const useWebSocket = (
     disconnect,
     getClientId,
     isConnected: status === 'connected',
-    retryCount
+    retryCount,
+    refreshModelStatus
   };
 }; 

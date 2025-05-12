@@ -1,64 +1,50 @@
 import React, { useEffect, useState } from 'react';
-import { useWebSocket } from '../context/WebSocketContext';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { ModelStatusData } from '../lib/types/websocket';
 
-interface ModelStatusProps {
-  onStatusChange?: (status: ModelStatusData) => void;
-}
+const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "";
 
-const ModelStatus: React.FC<ModelStatusProps> = ({ onStatusChange }) => {
-  const { modelStatus } = useWebSocket();
-  const [status, setStatus] = useState<ModelStatusData>({
-    streaming_enabled: true,
-    temperature: 0.7,
-    max_tokens: 150,
-    models: {
-      chat: 'unknown',
-      voice: 'unknown'
+const ModelStatus = () => {
+  const [modelStatus, setModelStatus] = useState<ModelStatusData | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState("disconnected");
+  const [lastPong, setLastPong] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+
+  const { status, sendMessage, refreshModelStatus } = useWebSocket(
+    wsUrl,
+    {
+      config: { endpoint: "model-status" },
+      onModelStatus: (payload) => setModelStatus(payload),
+      onConnection: () => setConnectionStatus("connected"),
+      onPong: (msg) => setLastPong(msg.timestamp || new Date().toISOString()),
+      onError: (err) => setError(err),
+      onStatusChange: (s) => setConnectionStatus(s),
     }
-  });
-
-  useEffect(() => {
-    if (!modelStatus.isConnected) return;
-
-    const handleStatusUpdate = (message: any) => {
-      if (message.type === 'model_status') {
-        setStatus(message.data);
-        onStatusChange?.(message.data);
-      }
-    };
-
-    modelStatus.onMessage?.(handleStatusUpdate);
-
-    // Request initial status
-    modelStatus.sendMessage?.({
-      type: 'command',
-      command: 'get_model_status',
-      timestamp: new Date().toISOString()
-    });
-
-    return () => {
-      modelStatus.offMessage?.(handleStatusUpdate);
-    };
-  }, [modelStatus.isConnected, onStatusChange]);
+  );
 
   return (
     <div className="model-status">
       <div className="status-row">
-        <div className={`status-indicator ${modelStatus.isConnected ? 'connected' : 'disconnected'}`} />
-        <span>Connection: {modelStatus.isConnected ? 'Connected' : 'Disconnected'}</span>
+        <div className={`status-indicator ${connectionStatus === 'connected' ? 'connected' : 'disconnected'}`} />
+        <span>Connection: {connectionStatus}</span>
       </div>
       
       <div className="model-info">
         <div className="info-row">
-          <span>Streaming: {status.streaming_enabled ? 'Enabled' : 'Disabled'}</span>
-          <span>Temperature: {status.temperature.toFixed(1)}</span>
+          <span>Streaming: {modelStatus?.streaming_enabled ? 'Enabled' : 'Disabled'}</span>
+          <span>Temperature: {modelStatus?.temperature.toFixed(1) || 'N/A'}</span>
         </div>
         <div className="info-row">
-          <span>Max Tokens: {status.max_tokens}</span>
-          <span>Models: {status.models.chat} / {status.models.voice}</span>
+          <span>Max Tokens: {modelStatus?.max_tokens || 'N/A'}</span>
+          <span>Models: {modelStatus?.models.chat || 'N/A'} / {modelStatus?.models.voice || 'N/A'}</span>
         </div>
       </div>
+
+      <div>
+        <button onClick={refreshModelStatus}>Refresh Model Status</button>
+      </div>
+      {lastPong && <div>Last pong: {lastPong}</div>}
+      {error && <div style={{ color: 'red' }}>Error: {error.message}</div>}
 
       <style jsx>{`
         .model-status {
@@ -109,5 +95,4 @@ const ModelStatus: React.FC<ModelStatusProps> = ({ onStatusChange }) => {
   );
 };
 
-export { ModelStatus };
 export default ModelStatus; 
