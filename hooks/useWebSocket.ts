@@ -107,9 +107,11 @@ export const useWebSocket = (
       console.log(`[WebSocket Hook] Initializing WebSocket for endpoint: ${options.config.endpoint}`);
       wsRef.current = WebSocketManager.getInstance(options.config.endpoint);
 
-      wsRef.current.on('statusChange', handleStatusChange);
-      wsRef.current.on('message', handleMessage);
-      wsRef.current.on('error', handleError);
+      if (wsRef.current && typeof wsRef.current.on === 'function') {
+        wsRef.current.on('statusChange', handleStatusChange);
+        wsRef.current.on('message', handleMessage);
+        wsRef.current.on('error', handleError);
+      }
 
       wsRef.current.connect({
         token: options.config.token,

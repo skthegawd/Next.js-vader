@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { AppProps } from 'next/app';
 import getConfig from 'next/config';
 import "../styles/globals.css";  // Global styles
@@ -7,9 +7,11 @@ import { AuthProvider } from "../context/AuthContext";
 import ThemeManager from '../lib/theme';
 import { WebSocketProvider } from '../context/WebSocketContext';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import api from '../lib/api';
 
 function MyApp({ Component, pageProps }: AppProps) {
     const { publicRuntimeConfig } = getConfig();
+    const [backendHealthy, setBackendHealthy] = useState(true);
 
     useEffect(() => {
         const initializeApp = async () => {
@@ -30,6 +32,14 @@ function MyApp({ Component, pageProps }: AppProps) {
                     );
                 }
 
+                // Health check: try /api/next/init
+                try {
+                    await api.get('/next/init');
+                    setBackendHealthy(true);
+                } catch (err) {
+                    setBackendHealthy(false);
+                }
+
                 // Initialize theme
                 const themeManager = ThemeManager.getInstance();
                 const { theme } = await themeManager.initialize();
@@ -42,6 +52,7 @@ function MyApp({ Component, pageProps }: AppProps) {
                 });
             } catch (error) {
                 console.error('[App] Initialization failed:', error);
+                setBackendHealthy(false);
                 // Re-throw the error to be caught by the ErrorBoundary
                 throw error;
             }
@@ -49,19 +60,37 @@ function MyApp({ Component, pageProps }: AppProps) {
 
         initializeApp().catch(error => {
             console.error('[App] Fatal initialization error:', error);
+            setBackendHealthy(false);
         });
     }, [publicRuntimeConfig]);
 
     return (
-        <ErrorBoundary>
-            <WebSocketProvider>
-                <AuthProvider>
-                    <Layout>
-                        <Component {...pageProps} />
-                    </Layout>
-                </AuthProvider>
-            </WebSocketProvider>
-        </ErrorBoundary>
+        <>
+            {!backendHealthy && (
+                <div style={{
+                    background: '#ff4444',
+                    color: 'white',
+                    padding: '1rem',
+                    textAlign: 'center',
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 9999
+                }}>
+                    Backend is unavailable. Some features may not work. Please try again later.
+                </div>
+            )}
+            <ErrorBoundary>
+                <WebSocketProvider>
+                    <AuthProvider>
+                        <Layout>
+                            <Component {...pageProps} />
+                        </Layout>
+                    </AuthProvider>
+                </WebSocketProvider>
+            </ErrorBoundary>
+        </>
     );
 }
 

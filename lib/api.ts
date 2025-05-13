@@ -70,7 +70,7 @@ const createAxiosInstance = (retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG): A
       'X-Platform': 'web',
     },
     withCredentials: true,
-    timeout: 10000, // 10 second timeout
+    timeout: 30000, // 30 second timeout
   });
 
   // Add retry interceptor

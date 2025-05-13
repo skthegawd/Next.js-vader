@@ -11,11 +11,10 @@ const nextConfig = {
     
     // Configure API routes
     async rewrites() {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://vader-yp5n.onrender.com';
         return [
             {
                 source: '/api/:path*',
-                destination: `${backendUrl}/api/:path*`,
+                destination: 'https://vader-yp5n.onrender.com/api/:path*',
             }
         ];
     },
@@ -24,13 +23,12 @@ const nextConfig = {
     async headers() {
         return [
             {
-                source: '/:path*',
+                source: '/api/:path*',
                 headers: [
-                    { key: 'Access-Control-Allow-Origin', value: '*' },
-                    { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, OPTIONS' },
-                    { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization, Accept, X-Requested-With' },
-                    { key: 'Access-Control-Max-Age', value: '86400' },
                     { key: 'Access-Control-Allow-Credentials', value: 'true' },
+                    { key: 'Access-Control-Allow-Origin', value: '*' },
+                    { key: 'Access-Control-Allow-Methods', value: 'GET,OPTIONS,PATCH,DELETE,POST,PUT' },
+                    { key: 'Access-Control-Allow-Headers', value: '*' },
                 ],
             },
         ];
