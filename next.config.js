@@ -9,12 +9,16 @@ const nextConfig = {
     // Configure build output
     output: 'standalone',
     
-    // Configure API routes
+    // Configure API routes and WebSocket
     async rewrites() {
         return [
             {
                 source: '/api/:path*',
-                destination: 'https://vader-yp5n.onrender.com/api/:path*',
+                destination: 'https://vader-yp5n.onrender.com/:path*',
+            },
+            {
+                source: '/ws',
+                destination: 'wss://vader-yp5n.onrender.com/api/ws',
             }
         ];
     },
@@ -81,8 +85,6 @@ const nextConfig = {
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://vader-yp5n.onrender.com/api',
         NEXT_PUBLIC_API_VERSION: process.env.NEXT_PUBLIC_API_VERSION || 'v1',
     },
-<<<<<<< HEAD
-=======
 
     // Ensure environment variables are available during runtime
     publicRuntimeConfig: {
@@ -91,7 +93,6 @@ const nextConfig = {
         NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://vader-yp5n.onrender.com/api',
         NEXT_PUBLIC_API_VERSION: process.env.NEXT_PUBLIC_API_VERSION || 'v1',
     },
->>>>>>> 949c958f4133402d1f0078f8192bed4c68fd1257
 };
 
 module.exports = nextConfig;
