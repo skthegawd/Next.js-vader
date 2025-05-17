@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import type { AppProps } from 'next/app';
-import getConfig from 'next/config';
 import "../styles/globals.css";  // Global styles
 import Layout from "../components/Layout";
 import { AuthProvider } from "../context/AuthContext";
@@ -10,7 +9,6 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import api from '../lib/api';
 
 function MyApp({ Component, pageProps }: AppProps) {
-    const { publicRuntimeConfig } = getConfig();
     const [backendHealthy, setBackendHealthy] = useState(true);
 
     useEffect(() => {
@@ -23,7 +21,7 @@ function MyApp({ Component, pageProps }: AppProps) {
                 ];
 
                 const missingEnvVars = requiredEnvVars.filter(
-                    (envVar) => !publicRuntimeConfig[envVar]
+                    (envVar) => !process.env[envVar]
                 );
 
                 if (missingEnvVars.length > 0) {
@@ -47,8 +45,8 @@ function MyApp({ Component, pageProps }: AppProps) {
                 // Log initialization success
                 console.log('[App] Initialization complete:', {
                     theme,
-                    backendUrl: publicRuntimeConfig.NEXT_PUBLIC_BACKEND_URL,
-                    wsUrl: publicRuntimeConfig.NEXT_PUBLIC_WS_URL
+                    backendUrl: process.env.NEXT_PUBLIC_BACKEND_URL,
+                    wsUrl: process.env.NEXT_PUBLIC_WS_URL
                 });
             } catch (error) {
                 console.error('[App] Initialization failed:', error);
@@ -62,7 +60,7 @@ function MyApp({ Component, pageProps }: AppProps) {
             console.error('[App] Fatal initialization error:', error);
             setBackendHealthy(false);
         });
-    }, [publicRuntimeConfig]);
+    }, []);
 
     return (
         <>
