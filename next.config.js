@@ -77,18 +77,21 @@ const nextConfig = {
     // Environment variables that should be available at build time
     env: {
         NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || 'https://vader-yp5n.onrender.com',
-        NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || 'wss://vader-yp5n.onrender.com/ws',
-        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://vader-yp5n.onrender.com',
+        NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || 'wss://vader-yp5n.onrender.com/api/ws',
+        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://vader-yp5n.onrender.com/api',
         NEXT_PUBLIC_API_VERSION: process.env.NEXT_PUBLIC_API_VERSION || 'v1',
     },
+<<<<<<< HEAD
+=======
 
     // Ensure environment variables are available during runtime
     publicRuntimeConfig: {
         NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || 'https://vader-yp5n.onrender.com',
-        NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || 'wss://vader-yp5n.onrender.com/ws',
-        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://vader-yp5n.onrender.com',
+        NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || 'wss://vader-yp5n.onrender.com/api/ws',
+        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://vader-yp5n.onrender.com/api',
         NEXT_PUBLIC_API_VERSION: process.env.NEXT_PUBLIC_API_VERSION || 'v1',
     },
+>>>>>>> 949c958f4133402d1f0078f8192bed4c68fd1257
 };
 
 module.exports = nextConfig;
