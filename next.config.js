@@ -19,21 +19,6 @@ const nextConfig = {
         ];
     },
 
-    // Configure headers for CORS
-    async headers() {
-        return [
-            {
-                source: '/api/:path*',
-                headers: [
-                    { key: 'Access-Control-Allow-Credentials', value: 'true' },
-                    { key: 'Access-Control-Allow-Origin', value: '*' },
-                    { key: 'Access-Control-Allow-Methods', value: 'GET,OPTIONS,PATCH,DELETE,POST,PUT' },
-                    { key: 'Access-Control-Allow-Headers', value: '*' },
-                ],
-            },
-        ];
-    },
-
     // Disable specific features that might cause issues
     typescript: {
         // !! WARN !!
@@ -77,16 +62,8 @@ const nextConfig = {
     // Environment variables that should be available at build time
     env: {
         NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || 'https://vader-yp5n.onrender.com',
-        NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || 'wss://vader-yp5n.onrender.com/api/ws',
-        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://vader-yp5n.onrender.com/api',
-        NEXT_PUBLIC_API_VERSION: process.env.NEXT_PUBLIC_API_VERSION || 'v1',
-    },
-
-    // Ensure environment variables are available during runtime
-    publicRuntimeConfig: {
-        NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL || 'https://vader-yp5n.onrender.com',
-        NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || 'wss://vader-yp5n.onrender.com/api/ws',
-        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://vader-yp5n.onrender.com/api',
+        NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || 'wss://vader-yp5n.onrender.com/ws',
+        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://vader-yp5n.onrender.com',
         NEXT_PUBLIC_API_VERSION: process.env.NEXT_PUBLIC_API_VERSION || 'v1',
     },
 };
