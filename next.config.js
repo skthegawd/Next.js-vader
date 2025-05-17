@@ -9,16 +9,12 @@ const nextConfig = {
     // Configure build output
     output: 'standalone',
     
-    // Configure API routes and WebSocket
+    // Configure API routes
     async rewrites() {
         return [
             {
                 source: '/api/:path*',
                 destination: 'https://vader-yp5n.onrender.com/:path*',
-            },
-            {
-                source: '/ws',
-                destination: 'wss://vader-yp5n.onrender.com/api/ws',
             }
         ];
     },
