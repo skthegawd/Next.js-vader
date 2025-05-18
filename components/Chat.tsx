@@ -1,13 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useChat } from '../hooks/useChat';
 
 export function Chat() {
-  const { isConnected, messages, sendMessage, setMessages } = useChat();
+  const { connect, isConnected, isConnecting, error, messages, sendMessage, setMessages } = useChat();
   const [input, setInput] = useState('');
+
+  useEffect(() => {
+    connect(); // Connect on mount
+    // Optionally, you could add logic to reconnect on demand
+    // return () => { /* cleanup if needed */ };
+  }, [connect]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim()) {
+    if (input.trim() && isConnected) {
       sendMessage(input);
       setMessages(prev => [
         ...prev,
@@ -36,15 +42,17 @@ export function Chat() {
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
-          placeholder={isConnected ? 'Type a message...' : 'Connecting...'}
-          disabled={!isConnected}
+          placeholder={isConnected ? 'Type a message...' : isConnecting ? 'Connecting...' : 'Not connected'}
+          disabled={!isConnected || isConnecting}
           style={{ flex: 1, padding: 12, borderRadius: 6, border: '1px solid #333', background: '#222', color: '#fff' }}
         />
-        <button type="submit" disabled={!isConnected || !input.trim()} style={{ padding: '0 24px', borderRadius: 6, background: isConnected ? '#2962ff' : '#888', color: '#fff', border: 'none', fontWeight: 'bold' }}>
+        <button type="submit" disabled={!isConnected || !input.trim() || isConnecting} style={{ padding: '0 24px', borderRadius: 6, background: isConnected ? '#2962ff' : '#888', color: '#fff', border: 'none', fontWeight: 'bold' }}>
           Send
         </button>
       </form>
-      {!isConnected && <div style={{ color: '#888', marginTop: 8 }}>Connecting...</div>}
+      {isConnecting && <div style={{ color: '#888', marginTop: 8 }}>Connecting to chat server...</div>}
+      {error && <div style={{ color: 'red', marginTop: 8 }}>Error: {error.message}</div>}
+      {!isConnected && !isConnecting && !error && <div style={{ color: '#888', marginTop: 8 }}>Not connected.</div>}
     </div>
   );
 } 
