@@ -1,20 +1,47 @@
 import { useState, useEffect } from 'react';
-import { useChat } from '../hooks/useChat';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 export function Chat() {
-  const { connect, isConnected, isConnecting, error, messages, sendMessage, setMessages } = useChat();
+  const { ws, error, isConnecting, connect } = useWebSocket('chat');
   const [input, setInput] = useState('');
+  const [messages, setMessages] = useState<{ content: string; timestamp: string }[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     connect(); // Connect on mount
-    // Optionally, you could add logic to reconnect on demand
-    // return () => { /* cleanup if needed */ };
+    // Cleanup handled by hook
   }, [connect]);
+
+  useEffect(() => {
+    if (!ws) return;
+    setIsConnected(ws.readyState === WebSocket.OPEN);
+    ws.onopen = () => setIsConnected(true);
+    ws.onclose = () => setIsConnected(false);
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        if (message.type === 'chat_response') {
+          setMessages((prev) => [...prev, message.data]);
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    };
+    // No need to cleanup ws.onmessage, as ws is replaced on reconnect
+  }, [ws]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (input.trim() && isConnected) {
-      sendMessage(input);
+    if (input.trim() && ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(
+        JSON.stringify({
+          type: 'chat',
+          data: {
+            content: input,
+            max_tokens: 2048,
+          },
+        })
+      );
       setMessages(prev => [
         ...prev,
         { content: input, timestamp: new Date().toISOString() }
