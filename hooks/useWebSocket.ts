@@ -1,23 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { WebSocketManager } from '../lib/websocket';
 import type { ConnectionStatus } from '../lib/websocket/WebSocketManager';
-
-interface WebSocketConfig {
-  endpoint: string;
-  token?: string;
-  maxRetries?: number;
-  retryInterval?: number;
-}
-
-interface WebSocketOptions {
-  config: WebSocketConfig;
-  onModelStatus?: (payload: any) => void;
-  onConnection?: (msg: any) => void;
-  onPong?: (msg: any) => void;
-  onError?: (error: Error) => void;
-  onStatusChange?: (status: ConnectionStatus) => void;
-  onMaxRetriesReached?: () => void;
-}
 
 interface WebSocketHookResult {
   status: ConnectionStatus;
@@ -150,27 +132,23 @@ export const useWebSocket = (endpoint: string): WebSocketHookResult => {
         const newCount = prev + 1;
         if (newCount >= maxRetries) {
           console.log(`[WebSocket Hook] Max retries (${maxRetries}) reached`);
-          onMaxRetriesReached?.();
         }
         return newCount;
       });
     }
-  }, [maxRetries, endpoint, onMaxRetriesReached]);
+  }, [maxRetries, endpoint]);
 
   const handleMessage = useCallback((msg: any) => {
     switch (msg.type) {
       case 'connection_established':
-        onConnection?.(msg);
         // Optionally, send get_model_status if endpoint is model-status
         if (endpoint === 'model-status') {
           refreshModelStatus();
         }
         break;
       case 'pong':
-        onPong?.(msg);
         break;
       case 'model_status':
-        onModelStatus?.(msg.payload);
         break;
       case 'error':
         setError(new Error(msg.payload?.message || 'WebSocket error'));
@@ -179,7 +157,7 @@ export const useWebSocket = (endpoint: string): WebSocketHookResult => {
         // Optionally handle other message types
         break;
     }
-  }, [endpoint, onModelStatus, onConnection, onPong]);
+  }, [endpoint, refreshModelStatus]);
 
   useEffect(() => {
     connect();
