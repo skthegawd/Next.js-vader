@@ -68,15 +68,36 @@ const createAxiosInstance = (retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG): A
       'Content-Type': 'application/json',
       'X-Client-Version': process.env.NEXT_PUBLIC_API_VERSION || 'v1',
       'X-Platform': 'web',
+      'X-Session-ID': getOrCreateSessionId(),
+      'Origin': 'https://next-js-vader.vercel.app',
     },
     withCredentials: true,
     timeout: 30000, // 30 second timeout
+  });
+
+  // Add request interceptor to always set fresh session ID
+  instance.interceptors.request.use((config) => {
+    config.headers = config.headers || {};
+    config.headers['X-Session-ID'] = getOrCreateSessionId();
+    config.headers['Origin'] = 'https://next-js-vader.vercel.app';
+    return config;
   });
 
   // Add retry interceptor
   instance.interceptors.response.use(
     (response) => response,
     async (error) => {
+      if (error.message && error.message.toLowerCase().includes('cors')) {
+        console.error('[API] CORS error detected:', {
+          url: error.config?.url,
+          method: error.config?.method,
+          headers: error.config?.headers,
+          message: error.message,
+          response: error.response,
+        });
+      } else if (error.isAxiosError && !error.response) {
+        console.error('[API] Network error (possible CORS):', error);
+      }
       const config = error.config;
       
       // Initialize retry count

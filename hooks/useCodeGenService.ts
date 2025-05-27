@@ -1,5 +1,6 @@
 import { Dispatch } from 'react';
 import { CodeGenState } from '../context/CodeGenContext';
+import { getOrCreateSessionId } from '../lib/config';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -18,6 +19,10 @@ function useCodeGenService(dispatch: Dispatch<any>) {
       const res = await fetch(`${API_URL}/api/codegen`, {
         method: 'POST',
         body: formData,
+        headers: {
+          'X-Session-ID': getOrCreateSessionId(),
+          'Origin': 'https://next-js-vader.vercel.app',
+        },
       });
       if (res.status === 429) {
         dispatch({ type: 'SET_RATE_LIMITED', payload: true });
@@ -52,6 +57,10 @@ function useCodeGenService(dispatch: Dispatch<any>) {
       const res = await fetch(`${API_URL}/api/upload`, {
         method: 'POST',
         body: formData,
+        headers: {
+          'X-Session-ID': getOrCreateSessionId(),
+          'Origin': 'https://next-js-vader.vercel.app',
+        },
       });
       if (!res.ok) {
         const err = await res.text();

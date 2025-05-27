@@ -128,20 +128,17 @@ class WebSocketManager {
 
       const url = new URL(baseUrl);
       url.protocol = url.protocol.replace('http', 'ws');
-      url.pathname = '/api/ws';
-      
-      url.searchParams.append('endpoint', this.endpoint);
-      url.searchParams.append('client_id', this.clientId);
-
+      url.pathname = '/ws';
+      url.searchParams.set('endpoint', this.endpoint);
+      url.searchParams.set('client_id', getOrCreateSessionId());
       if (this.token) {
-        url.searchParams.append('token', this.token);
+        url.searchParams.set('token', this.token);
       }
-
       const apiVersion = process.env.NEXT_PUBLIC_API_VERSION;
       if (apiVersion) {
-        url.searchParams.append('version', apiVersion);
+        url.searchParams.set('version', apiVersion);
       }
-
+      console.log(`[WebSocket] Constructed URL: ${url.toString()}`);
       return url.toString();
     } catch (error) {
       console.error('[WebSocket] Error constructing URL:', error);
@@ -154,6 +151,7 @@ class WebSocketManager {
   }
 
   private handleMessage = (event: MessageEvent) => {
+    console.log(`[WebSocket ${this.endpoint}] Received message:`, event.data);
     try {
       const message = JSON.parse(event.data) as WSMessage;
       
@@ -206,7 +204,7 @@ class WebSocketManager {
 
     try {
       const wsUrl = this.getWebSocketUrl();
-      console.debug(`[WebSocket ${this.endpoint}] Connecting to ${wsUrl}`);
+      console.log(`[WebSocket ${this.endpoint}] Attempting connection to ${wsUrl}`);
       
       this.ws = new WebSocket(wsUrl);
       this.setupEventListeners();
@@ -224,13 +222,18 @@ class WebSocketManager {
 
         this.ws.onopen = () => {
           clearTimeout(timeout);
+          console.log(`[WebSocket ${this.endpoint}] Connection opened`);
+          this.reconnectAttempts = 0;
+          this.updateStatus('connected');
+          this.startPingInterval();
           resolve();
         };
 
-        this.ws.onerror = (error) => {
+        this.ws.onerror = (event) => {
           clearTimeout(timeout);
+          console.error(`[WebSocket ${this.endpoint}] Error:`, event);
           reject(new WebSocketError(
-            error instanceof ErrorEvent ? error.message : 'Unknown WebSocket error',
+            event instanceof ErrorEvent ? event.message : 'Unknown WebSocket error',
             WebSocketErrorCode.CONNECTION_FAILED
           ));
         };
@@ -247,22 +250,10 @@ class WebSocketManager {
   private setupEventListeners() {
     if (!this.ws) return;
 
-    this.ws.onopen = () => {
-      console.debug(`[WebSocket ${this.endpoint}] Connected successfully`);
-      this.reconnectAttempts = 0;
-      this.updateStatus('connected');
-      this.startPingInterval();
-    };
-
     this.ws.onmessage = this.handleMessage;
 
-    this.ws.onerror = (event) => {
-      const errorMessage = event instanceof ErrorEvent ? event.message : 'Unknown WebSocket error';
-      console.error(`[WebSocket ${this.endpoint}] Connection error:`, errorMessage);
-      this.handleError(new WebSocketError(errorMessage, WebSocketErrorCode.CONNECTION_FAILED));
-    };
-
     this.ws.onclose = (event) => {
+      console.warn(`[WebSocket ${this.endpoint}] Connection closed: code=${event.code}, reason=${event.reason}`);
       this.updateStatus('disconnected');
       this.stopPingInterval();
       
@@ -320,6 +311,7 @@ class WebSocketManager {
 
     this.reconnectAttempts++;
     const delay = Math.min(this.reconnectTimeout * Math.pow(2, this.reconnectAttempts), 30000);
+    console.warn(`[WebSocket ${this.endpoint}] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
     
     await new Promise(resolve => setTimeout(resolve, delay));
     
@@ -351,6 +343,7 @@ class WebSocketManager {
 
   private sendMessage(message: WSMessage) {
     if (this.ws?.readyState === WebSocket.OPEN) {
+      console.log(`[WebSocket ${this.endpoint}] Sending message:`, message);
       this.ws.send(JSON.stringify(message));
     } else {
       console.warn(`[WebSocket ${this.endpoint}] Cannot send message - connection not open`);

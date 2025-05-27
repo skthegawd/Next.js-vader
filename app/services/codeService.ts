@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { CodeSpecification, CodeAnalysis, ExportOptions } from '../types/code';
+import { getOrCreateSessionId } from '../../lib/config';
 
 export class CodeService {
   private static instance: CodeService;
@@ -18,7 +19,12 @@ export class CodeService {
 
   async generateCode(specification: CodeSpecification) {
     try {
-      const response = await axios.post(`${this.baseUrl}/code/generate`, specification);
+      const response = await axios.post(`${this.baseUrl}/code/generate`, specification, {
+        headers: {
+          'X-Session-ID': getOrCreateSessionId(),
+          'Origin': 'https://next-js-vader.vercel.app',
+        },
+      });
       return response.data;
     } catch (error: any) {
       return {
@@ -30,7 +36,12 @@ export class CodeService {
 
   async analyzeCode(code: string, language: string) {
     try {
-      const response = await axios.post(`${this.baseUrl}/code/analyze`, { code, language });
+      const response = await axios.post(`${this.baseUrl}/code/analyze`, { code, language }, {
+        headers: {
+          'X-Session-ID': getOrCreateSessionId(),
+          'Origin': 'https://next-js-vader.vercel.app',
+        },
+      });
       return response.data;
     } catch (error: any) {
       return {
@@ -47,7 +58,11 @@ export class CodeService {
         format: options.format,
         options
       }, {
-        responseType: options.format === 'zip' || options.format === 'tar' ? 'blob' : 'json'
+        responseType: options.format === 'zip' || options.format === 'tar' ? 'blob' : 'json',
+        headers: {
+          'X-Session-ID': getOrCreateSessionId(),
+          'Origin': 'https://next-js-vader.vercel.app',
+        },
       });
 
       if (options.format === 'zip' || options.format === 'tar') {
