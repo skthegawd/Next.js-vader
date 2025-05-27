@@ -22,7 +22,6 @@ export class CodeService {
       const response = await axios.post(`${this.baseUrl}/code/generate`, specification, {
         headers: {
           'X-Session-ID': getOrCreateSessionId(),
-          'Origin': 'https://next-js-vader.vercel.app',
         },
       });
       return response.data;
@@ -39,7 +38,6 @@ export class CodeService {
       const response = await axios.post(`${this.baseUrl}/code/analyze`, { code, language }, {
         headers: {
           'X-Session-ID': getOrCreateSessionId(),
-          'Origin': 'https://next-js-vader.vercel.app',
         },
       });
       return response.data;
@@ -61,7 +59,6 @@ export class CodeService {
         responseType: options.format === 'zip' || options.format === 'tar' ? 'blob' : 'json',
         headers: {
           'X-Session-ID': getOrCreateSessionId(),
-          'Origin': 'https://next-js-vader.vercel.app',
         },
       });
 

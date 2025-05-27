@@ -69,7 +69,6 @@ const createAxiosInstance = (retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG): A
       'X-Client-Version': process.env.NEXT_PUBLIC_API_VERSION || 'v1',
       'X-Platform': 'web',
       'X-Session-ID': getOrCreateSessionId(),
-      'Origin': 'https://next-js-vader.vercel.app',
     },
     withCredentials: true,
     timeout: 30000, // 30 second timeout
@@ -79,7 +78,6 @@ const createAxiosInstance = (retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG): A
   instance.interceptors.request.use((config) => {
     config.headers = config.headers || {};
     config.headers['X-Session-ID'] = getOrCreateSessionId();
-    config.headers['Origin'] = 'https://next-js-vader.vercel.app';
     return config;
   });
 

@@ -11,6 +11,7 @@ import {
   WebSocketErrorCode
 } from './types';
 import { Config } from './config';
+import { getOrCreateSessionId } from './config';
 
 export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 

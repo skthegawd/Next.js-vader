@@ -21,7 +21,6 @@ function useCodeGenService(dispatch: Dispatch<any>) {
         body: formData,
         headers: {
           'X-Session-ID': getOrCreateSessionId(),
-          'Origin': 'https://next-js-vader.vercel.app',
         },
       });
       if (res.status === 429) {
@@ -59,7 +58,6 @@ function useCodeGenService(dispatch: Dispatch<any>) {
         body: formData,
         headers: {
           'X-Session-ID': getOrCreateSessionId(),
-          'Origin': 'https://next-js-vader.vercel.app',
         },
       });
       if (!res.ok) {
