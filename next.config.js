@@ -58,14 +58,6 @@ const nextConfig = {
 
         return config;
     },
-
-    // Environment variables that should be available at build time
-    env: {
-        NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL,
-        NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL,
-        NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-        NEXT_PUBLIC_API_VERSION: process.env.NEXT_PUBLIC_API_VERSION,
-    },
 };
 
 module.exports = nextConfig;
