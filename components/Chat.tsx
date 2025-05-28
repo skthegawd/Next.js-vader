@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 
-export function Chat() {
+const Chat = () => {
   const { ws, error, isConnecting, connect } = useWebSocket('chat');
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<{ content: string; timestamp: string }[]>([]);
@@ -82,4 +82,6 @@ export function Chat() {
       {!isConnected && !isConnecting && !error && <div style={{ color: '#888', marginTop: 8 }}>Not connected.</div>}
     </div>
   );
-} 
+};
+
+export default Chat; 
