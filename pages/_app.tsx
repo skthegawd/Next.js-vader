@@ -14,22 +14,6 @@ function MyApp({ Component, pageProps }: AppProps) {
     useEffect(() => {
         const initializeApp = async () => {
             try {
-                // Check for required environment variables
-                const requiredEnvVars = [
-                    'NEXT_PUBLIC_BACKEND_URL',
-                    'NEXT_PUBLIC_WS_URL'
-                ];
-
-                const missingEnvVars = requiredEnvVars.filter(
-                    (envVar) => !process.env[envVar]
-                );
-
-                if (missingEnvVars.length > 0) {
-                    throw new Error(
-                        `Missing required environment variables: ${missingEnvVars.join(', ')}`
-                    );
-                }
-
                 // Health check: try /api/next/init
                 try {
                     await api.get('/next/init');
@@ -45,18 +29,12 @@ function MyApp({ Component, pageProps }: AppProps) {
                 // Log initialization success
                 console.log('[App] Initialization complete:', {
                     theme,
-                    backendUrl: process.env.NEXT_PUBLIC_BACKEND_URL,
-                    wsUrl: process.env.NEXT_PUBLIC_WS_URL
+                    backendUrl: BACKEND_URL,
+                    wsUrl: WS_URL
                 });
-
-                if (typeof window !== 'undefined') {
-                    console.log('NEXT_PUBLIC_BACKEND_URL:', process.env.NEXT_PUBLIC_BACKEND_URL);
-                    console.log('NEXT_PUBLIC_WS_URL:', process.env.NEXT_PUBLIC_WS_URL);
-                }
             } catch (error) {
                 console.error('[App] Initialization failed:', error);
                 setBackendHealthy(false);
-                // Re-throw the error to be caught by the ErrorBoundary
                 throw error;
             }
         };
