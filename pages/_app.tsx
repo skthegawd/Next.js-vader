@@ -48,6 +48,11 @@ function MyApp({ Component, pageProps }: AppProps) {
                     backendUrl: process.env.NEXT_PUBLIC_BACKEND_URL,
                     wsUrl: process.env.NEXT_PUBLIC_WS_URL
                 });
+
+                if (typeof window !== 'undefined') {
+                    console.log('NEXT_PUBLIC_BACKEND_URL:', process.env.NEXT_PUBLIC_BACKEND_URL);
+                    console.log('NEXT_PUBLIC_WS_URL:', process.env.NEXT_PUBLIC_WS_URL);
+                }
             } catch (error) {
                 console.error('[App] Initialization failed:', error);
                 setBackendHealthy(false);
