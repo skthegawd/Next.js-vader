@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { ConnectionStatus } from '../lib/websocket/WebSocketManager';
+import { WS_URL, API_VERSION } from '../lib/config';
 
 interface WebSocketHookResult {
   status: ConnectionStatus;
@@ -57,7 +58,7 @@ export const useWebSocket = (endpoint: string): WebSocketHookResult => {
 
       // Create WebSocket connection
       const wsInstance = new WebSocket(
-        `${process.env.NEXT_PUBLIC_WS_URL}?endpoint=${endpoint}&client_id=${clientIdRef.current}&version=${process.env.NEXT_PUBLIC_API_VERSION}`
+        `${WS_URL}?endpoint=${endpoint}&client_id=${clientIdRef.current}&version=${API_VERSION}`
       );
 
       // Add connection timeout

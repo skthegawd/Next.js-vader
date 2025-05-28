@@ -1,6 +1,6 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import type { ApiConfig, ApiResponse, SessionData, ThemeData } from './types';
-import { getOrCreateSessionId } from './config';
+import { getOrCreateSessionId, BACKEND_URL, WS_URL, API_URL, API_VERSION } from './config';
 
 // API Error class with better error categorization
 export class ApiError extends Error {
@@ -63,10 +63,10 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
 // Create axios instance
 const createAxiosInstance = (retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG): AxiosInstance => {
   const instance = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'https://vader-yp5n.onrender.com',
+    baseURL: API_URL ?? 'https://vader-yp5n.onrender.com',
     headers: {
       'Content-Type': 'application/json',
-      'X-Client-Version': process.env.NEXT_PUBLIC_API_VERSION || 'v1',
+      'X-Client-Version': API_VERSION || 'v1',
       'X-Platform': 'web',
       'X-Session-ID': getOrCreateSessionId(),
     },
@@ -181,78 +181,4 @@ const api = {
     // Use EventSource for SSE streaming
     const session_id = getOrCreateSessionId();
     const params = new URLSearchParams({ session_id });
-    const url = `/api/chat/stream?${params.toString()}`;
-    return new Promise((resolve, reject) => {
-      const eventSource = new EventSource(url);
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          onChunk(data);
-          if (data.type === 'stream_end') {
-            eventSource.close();
-            resolve();
-          }
-        } catch (err) {
-          eventSource.close();
-          reject(err);
-        }
-      };
-      eventSource.onerror = (err) => {
-        eventSource.close();
-        reject(err);
-      };
-      // Send initial message via fetch to start the stream
-      fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: message,
-          session_id,
-          stream: true,
-          temperature: options.temperature,
-          max_tokens: options.maxTokens,
-        }),
-      });
-    });
-  },
-
-  async sendToAI(
-    message: string,
-    options: {
-      stream?: boolean;
-      onChunk?: (chunk: string) => void;
-      temperature?: number;
-      maxTokens?: number;
-    } = {}
-  ): Promise<ApiResponse<any>> {
-    try {
-      if (options.stream) {
-        return this.streamChat(message, options.onChunk || (() => {}));
-      }
-
-      const response = await axiosInstance.post('/api/chat', {
-        content: message,
-        session_id: getOrCreateSessionId(),
-        temperature: options.temperature,
-        max_tokens: options.maxTokens,
-      });
-
-      return response.data;
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      throw ApiError.fromAxiosError(error as AxiosError);
-    }
-  },
-
-  async getModelStatus(): Promise<ApiResponse<any>> {
-    try {
-      const response = await axiosInstance.get('/api/model-status');
-      return response.data;
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      throw ApiError.fromAxiosError(error as AxiosError);
-    }
-  }
-};
-
-export default api; 
+    const url = `/api/chat/stream?${params.toString()}`

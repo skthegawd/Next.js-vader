@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { ModelStatusData } from '../lib/types/websocket';
+import { WS_URL } from '../lib/config';
 
-const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "";
+const wsUrl = WS_URL || "";
 
 const ModelStatus = () => {
   const [modelStatus, setModelStatus] = useState<ModelStatusData | null>(null);

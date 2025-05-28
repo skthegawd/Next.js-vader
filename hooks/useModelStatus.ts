@@ -2,9 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { WebSocketManager } from '../lib/websocket';
 import { ModelStatus } from '../types/model';
 import { WSMessage } from '../types/websocket';
+import { API_URL, WS_URL } from '../lib/config';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || '';
 const POLLING_INTERVAL = 30000; // 30 seconds
 
 interface UseModelStatusOptions {
@@ -26,7 +25,7 @@ export const useModelStatus = (options: UseModelStatusOptions = {}) => {
   const fetchModelStatus = useCallback(async () => {
     try {
       console.debug('[ModelStatus] Fetching status...');
-      const response = await fetch(`${API_BASE_URL}/model-status`);
+      const response = await fetch(`${API_URL}/model-status`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -132,7 +131,7 @@ export const useModelStatus = (options: UseModelStatusOptions = {}) => {
   const updateModelParameters = useCallback(async (modelType: string, parameters: any) => {
     try {
       console.debug('[ModelStatus] Updating parameters:', { modelType, parameters });
-      const response = await fetch(`${API_BASE_URL}/model-status/${modelType}/parameters`, {
+      const response = await fetch(`${API_URL}/model-status/${modelType}/parameters`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

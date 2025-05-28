@@ -71,4 +71,9 @@ export function getOrCreateSessionId(): string {
     }
   }
   return sessionId;
-} 
+}
+
+export const BACKEND_URL = "https://vader-yp5n.onrender.com";
+export const WS_URL = "wss://vader-yp5n.onrender.com/ws";
+export const API_URL = "https://vader-yp5n.onrender.com";
+export const API_VERSION = "v1"; 

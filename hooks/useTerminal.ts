@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { WebSocketManager } from '../lib/websocket';
 import { WSStreamMessage } from '../types/websocket';
-
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || '';
+import { WS_URL } from '../lib/config';
 
 interface TerminalOutput {
   content: string;

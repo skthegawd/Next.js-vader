@@ -1,13 +1,13 @@
 import axios from 'axios';
 import { CodeSpecification, CodeAnalysis, ExportOptions } from '../types/code';
-import { getOrCreateSessionId } from '../../lib/config';
+import { getOrCreateSessionId, API_URL } from '../../lib/config';
 
 export class CodeService {
   private static instance: CodeService;
   private baseUrl: string;
 
   private constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+    this.baseUrl = API_URL || 'http://localhost:8000/api';
   }
 
   public static getInstance(): CodeService {

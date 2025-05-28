@@ -1,8 +1,6 @@
 import { Dispatch } from 'react';
 import { CodeGenState } from '../context/CodeGenContext';
-import { getOrCreateSessionId } from '../lib/config';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+import { getOrCreateSessionId, API_URL } from '../lib/config';
 
 function useCodeGenService(dispatch: Dispatch<any>) {
   // Generate code or analyze

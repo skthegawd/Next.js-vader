@@ -1,10 +1,12 @@
+const { BACKEND_URL } = require('../../lib/config');
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method Not Allowed" });
   }
 
   try {
-    const response = await fetch(process.env.NEXT_PUBLIC_BACKEND_URL + "/api/wakeword", {
+    const response = await fetch(BACKEND_URL + "/api/wakeword", {
       method: "POST",
     });
 

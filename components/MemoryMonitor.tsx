@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { WS_URL } from '../lib/config';
 
 interface MemoryStats {
   rss_mb: number;
@@ -8,7 +9,7 @@ interface MemoryStats {
   system_available_mb: number;
 }
 
-const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "";
+const wsUrl = WS_URL || "";
 
 const MemoryMonitor = () => {
   const [modelStatus, setModelStatus] = useState(null);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getOrCreateSessionId } from '../lib/config';
+import { getOrCreateSessionId, WS_URL, API_VERSION } from '../lib/config';
 
 interface ChatResponse {
   content: string;
@@ -25,7 +25,7 @@ export function useChat(endpoint = 'chat') {
       // 2. Generate a stable client ID
       const clientId = getOrCreateSessionId();
       // 3. Connect to WebSocket
-      const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL}?endpoint=${endpoint}&client_id=${clientId}&version=${process.env.NEXT_PUBLIC_API_VERSION}`;
+      const wsUrl = `${WS_URL}?endpoint=${endpoint}&client_id=${clientId}&version=${API_VERSION}`;
       console.log(`[Chat WebSocket] Connecting to: ${wsUrl}`);
       const wsInstance = new WebSocket(wsUrl);
       // 4. Add connection timeout

@@ -11,7 +11,7 @@ import {
   WebSocketErrorCode
 } from './types';
 import { Config } from './config';
-import { getOrCreateSessionId } from './config';
+import { getOrCreateSessionId, WS_URL, API_VERSION } from './config';
 
 export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
@@ -122,7 +122,7 @@ class WebSocketManager {
     }
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_WS_URL;
+      const baseUrl = WS_URL;
       if (!baseUrl) {
         throw new Error('NEXT_PUBLIC_WS_URL environment variable is not set');
       }
@@ -135,7 +135,7 @@ class WebSocketManager {
       if (this.token) {
         url.searchParams.set('token', this.token);
       }
-      const apiVersion = process.env.NEXT_PUBLIC_API_VERSION;
+      const apiVersion = API_VERSION;
       if (apiVersion) {
         url.searchParams.set('version', apiVersion);
       }
