@@ -7,6 +7,7 @@ import ThemeManager from '../lib/theme';
 import { WebSocketProvider } from '../context/WebSocketContext';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import api from '../lib/api';
+import { BACKEND_URL, WS_URL } from '../lib/config';
 
 function MyApp({ Component, pageProps }: AppProps) {
     const [backendHealthy, setBackendHealthy] = useState(true);
