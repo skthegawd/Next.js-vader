@@ -170,6 +170,7 @@ const api = {
     }
   },
 
+  /*
   async streamChat(
     message: string,
     onChunk: (chunk: any) => void,
@@ -181,4 +182,11 @@ const api = {
     // Use EventSource for SSE streaming
     const session_id = getOrCreateSessionId();
     const params = new URLSearchParams({ session_id });
-    const url = `/api/chat/stream?${params.toString()}`
+    const url = `/api/chat/stream?${params.toString()}`;
+    // TODO: Implement the rest of this function
+    return;
+  },
+  */
+};
+
+export default api;
