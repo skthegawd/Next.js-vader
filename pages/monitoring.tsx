@@ -1,6 +1,6 @@
 import React from 'react';
-import { MemoryMonitor } from '../components/MemoryMonitor';
-import { ModelStatus } from '../components/ModelStatus';
+import MemoryMonitor from '../components/MemoryMonitor';
+import ModelStatus from '../components/ModelStatus';
 import { Config } from '../lib/config';
 import { useWebSocket } from '../context/WebSocketContext';
 
